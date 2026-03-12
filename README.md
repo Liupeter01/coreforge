@@ -11,7 +11,7 @@ libHPC is a high-performance computing library focused on Linux and Windows envi
 
 **PLEASE READ CAREFULLY BEFORE PROCEEDING.**
 
-1.  **INTERVIEW EVALUATION ONLY**: This codebase is provided **STRICTLY** for individual technical interview evaluation. Any other use is a violation of Intellectual Property.
+1.  **INTERVIEW EVALUATION ONLY**: This codebase is provided **STRICTLY** for educational purposes or individual technical interview evaluation. Any other use is a violation of Intellectual Property.
 2.  **NON-COMMERCIAL ONLY**: Any commercial use, including but not limited to integration into proprietary trading systems, HFT frameworks, or industrial HPC clusters, is **STRICTLY PROHIBITED**.
 3.  **NO DERIVATIVE WORKS**: You may not modify, distribute, or create derivative works based on these SIMD/CUDA kernels for corporate gain.
 4.  **MONITORING & ENFORCEMENT**: The author actively monitors repository access logs and visitor metadata (including LinkedIn referral tracking). Unauthorized commercial exploitation identified via logic-pattern matching or binary analysis will be met with **immediate legal action and public disclosure of the infringing entity.**
