@@ -48,11 +48,3 @@ Specifically, **`std::__1::__hash_memory`**, a critical dependency for **oneTBB*
 
 Since this is a breaking change in the Apple SDK/Toolchain itself, it cannot be resolved within libHPC. As a result, macOS ARM support has been formally dropped to maintain the integrity of the HPC pipeline.
 
----
-
-## 0x03 Core Features
-
-* **SIMD Kernels**: Hand-optimized AVX2/AVX-512 paths for compute-intensive tasks.
-* **Concurrency**: Lock-free data structures optimized for high-throughput messaging.
-* **Memory Management**: Custom NUMA-aware allocators for low-latency workloads.
-* **GPU Integration**: CUDA-accelerated compute kernels for massive parallel processing.
