@@ -53,5 +53,3 @@ libHPC includes GPU-accelerated kernels optimized for high-throughput computatio
 - **Concurrent GPU Pipelines:** Supports asynchronous kernel launches and stream-based scheduling for overlapping compute and memory operations.  
 - **Profiling & Validation:** Includes tools for warp efficiency, memory access analysis, and synchronization correctness across GPU architectures.  
 - **Realistic HPC Throughput:** Designed for bulk-parallel computation and scientific workloads, **not** real-time ultra-low-latency trading systems.
-
-These GPU kernels demonstrate **high-throughput, deterministic, and reproducible performance**, complementing the CPU/SIMD components of libHPC.
