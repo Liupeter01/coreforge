@@ -48,7 +48,7 @@ Since this is a breaking change in the Apple SDK/Toolchain itself, it cannot be 
 ## 0x03 GPU Performance Optimization Highlights
 libHPC includes GPU-accelerated kernels optimized for high-throughput computation on NVIDIA CUDA-compatible devices:
 
-- **Radix-Sort Kernel:** Processes 500M elements in ~360ms on an RTX 3080 Ti, achieving ~1.39 billion operations per second.  
+- **Radix-Sort Kernel:** Processes 500M elements in ~360ms on an RTX 3080 Ti(laptop), achieving ~1.39 billion operations per second.  
 - **Warp-Synchronous & Tiled Memory Layouts:** Maximizes shared memory utilization and minimizes global memory latency.  
 - **Concurrent GPU Pipelines:** Supports asynchronous kernel launches and stream-based scheduling for overlapping compute and memory operations.  
 - **Profiling & Validation:** Includes tools for warp efficiency, memory access analysis, and synchronization correctness across GPU architectures.  
