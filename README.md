@@ -1,7 +1,7 @@
-# libHPC: High-Performance Computing Core
+# Coreforge: High-Performance Computing Core
 ## License Platform
 
-libHPC is a high-performance computing library focused on Linux and Windows environments. It provides SIMD-optimized kernels, concurrent data structures, GPU utilities, and HPC-oriented memory management components.
+Coreforge is a high-performance computing library focused on Linux and Windows environments. It provides SIMD-optimized kernels, concurrent data structures, GPU utilities, and HPC-oriented memory management components.
 
 ---
 
