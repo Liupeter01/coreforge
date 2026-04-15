@@ -5,16 +5,6 @@ Coreforge is a high-performance computing library focused on Linux and Windows e
 
 ---
 
-## 🛑 STRICT LICENSE & USAGE TERMS / 授权与使用条款
-**PLEASE READ CAREFULLY BEFORE PROCEEDING.**
-
-- **INTERVIEW EVALUATION ONLY:** This codebase is provided STRICTLY for educational purposes or individual technical interview evaluation. Any other use is a violation of Intellectual Property.  
-- **NON-COMMERCIAL ONLY:** Any commercial use, including but not limited to integration into proprietary trading systems, HFT frameworks, or industrial HPC clusters, is STRICTLY PROHIBITED.  
-- **NO DERIVATIVE WORKS:** You may not modify, distribute, or create derivative works based on these SIMD/CUDA kernels for corporate gain.  
-- **MONITORING & ENFORCEMENT:** The author actively monitors repository access logs and visitor metadata (including LinkedIn referral tracking). Unauthorized commercial exploitation identified via logic-pattern matching or binary analysis will be met with immediate legal action and public disclosure of the infringing entity.
-
----
-
 ## 0x00 Platform Support
 | Platform | Status |
 |---------|--------|
