@@ -4,6 +4,7 @@
 #include <linearUtils.cuh>
 #include <stdexcept>
 #include <string>
+#include <cuda_fp16.h>
 #include <system_error>
 
 namespace cudahelper {
@@ -28,6 +29,20 @@ inline void throwCudaError(const cudaError_t e, const char *file, int line) {
 
 #define GLOBAL_LINEAR_TID util::global_linear_tid()
 #define GLOBAL_LINEAR_STRIDE util::global_linear_stride()
+
+#define MAX_EXP_F32  (88.3762626647949f)
+#define MIN_EXP_F32 (-88.3762626647949f)
+#define MAX_EXP_F16  (__float2half(11.089866488461016f))
+#define MIN_EXP_F16  (__float2half(-9.704060527839234f))
+
+#define EXP_HALF_CLIP(x) do{ \
+          (x) = __hmin(__hmax(MIN_EXP_F16, (x)), MAX_EXP_F16); \
+ }while(0)
+
+#define EXP_HALF2_CLIP(in) do{ \
+          (in.x) = __hmin(__hmax(MIN_EXP_F16, (in.x)), MAX_EXP_F16); \
+          (in.y) = __hmin(__hmax(MIN_EXP_F16, (in.y)), MAX_EXP_F16); \
+ }while(0)
 
 template <bool Exclusive>
 __device__ __forceinline__ uint32_t warp_scan(uint32_t v, int lane) {
