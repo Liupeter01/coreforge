@@ -9,6 +9,7 @@ project(
 
 add_subdirectory(external/benchmark)
 add_subdirectory(external/libmorton)
+add_subdirectory(external/pybind11)
 add_subdirectory(lib/sparse)
 add_subdirectory(lib/hpc)
 add_subdirectory(lib/concurrency)
