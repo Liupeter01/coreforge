@@ -48,6 +48,16 @@ __device__ __forceinline__ half2 sigmoid_half2_percise(half2 x) {
 }
 } // namespace details
 
+__global__ void sigmoid_fp16_kernel(half* __restrict src,
+          half* __restrict dst, int N) {
+
+}
+
+__global__ void sigmoid_fp16x2_kernel(half* __restrict src,
+          half* __restrict dst, int N) {
+
+}
+
 __global__ void sigmoid_fp16x8_unpacked_kernel(half *__restrict src,
                                                half *__restrict dst, int N) {
   const int idx = 8 * (threadIdx.x + blockDim.x * blockIdx.x);
@@ -101,4 +111,15 @@ __global__ void sigmoid_fp16x8_packed_kernel(half *__restrict src,
 
   *(reinterpret_cast<float4 *>(&dst[idx + 0])) = out;
 }
+
+__global__ void sigmoid_fp32_kernel(float* __restrict src,
+          float* __restrict dst, int N){
+
+}
+
+__global__ void sigmoid_fp32x4_kernel(float* __restrict src,
+          float* __restrict dst, int N) {
+
+}
+
 } // namespace cuda_operator
