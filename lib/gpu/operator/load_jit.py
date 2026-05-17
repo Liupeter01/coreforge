@@ -18,7 +18,7 @@ extra_cflags=[
         "--expt-extended-lambda",
         "-DWIN32_LEAN_AND_MEAN",
         "-D_HAS_STD_BYTE=0",
-        "-std=c++17",
+        "--std=c++17",
     ],
     verbose=True,
 )
