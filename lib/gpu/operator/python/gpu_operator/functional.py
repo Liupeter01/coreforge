@@ -3,6 +3,7 @@ import torch
 from gpu_operator._C import relu_f32 as _relu_f32_cuda
 from gpu_operator._C import relu_generic as _relu_generic_cuda
 
+
 def relu_generic(input: torch.Tensor) -> torch.Tensor:
     """
     Custom ReLU activation.
@@ -17,14 +18,16 @@ def relu_generic(input: torch.Tensor) -> torch.Tensor:
         Output tensor with ReLU applied element-wise.
     """
     if not input.is_floating_point():
-        raise TypeError(f"relu requires floating point input, got {input.dtype}")
+        raise TypeError(
+            f"relu requires floating point input, got {input.dtype}")
 
     if input.is_cuda:
         return _relu_f32_cuda(input)
     else:
         # CPU fallback
         return torch.nn.functional.relu(input)
-   
+
+
 def relu_f32(input: torch.Tensor) -> torch.Tensor:
     """
     ReLU activation, Float32 only, CUDA only.
