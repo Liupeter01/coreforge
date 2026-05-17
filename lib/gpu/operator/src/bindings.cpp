@@ -1,5 +1,6 @@
 #include <cuda_relu.cuh>
 
+#if defined(USE_TORCH) && defined(USE_PYBIND11)
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           m.doc() = "My GPU Operators - Custom CUDA kernels for PyTorch";
 
@@ -9,3 +10,4 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           m.def("relu", &relu_generic, "ReLU activation for all floating types (CUDA)",
                     py::arg("src"));
 }
+#endif

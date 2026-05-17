@@ -3,9 +3,11 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#if defined(USE_TORCH) 
 #include <torch/types.h>
 #include <torch/extension.h>
 #include <c10/cuda/CUDAGuard.h> 
+#endif
 
 namespace cuda_operator {
 
@@ -20,29 +22,40 @@ namespace cuda_operator {
                               dst[idx] = details::relu_float(src[idx]);
           }
 
-         template <typename scalar_t>
+
+          template <typename scalar_t>
           __global__ void relu_generic_kernel(const scalar_t* __restrict__ src,
-                    scalar_t* __restrict__ dst, int N) {
+                    scalar_t* __restrict__ dst,
+                    int N) {
                     int idx = threadIdx.x + blockIdx.x * blockDim.x;
-                    if (idx < N) {
-                              scalar_t x = src[idx];
-                               if constexpr (std::is_same_v<scalar_t, c10::BFloat16> || std::is_same_v<scalar_t, __nv_bfloat16>) {
-                                        const __nv_bfloat16 zero = __float2bfloat16(0.0f);
-                                        dst[idx] = __hgt(x, zero) ? x : zero;
-                              }
-                              else if constexpr (std::is_same_v<scalar_t, __half> || std::is_same_v<scalar_t, c10::Half>) {
-                                         const __half zero = __float2half(0.0f);
-                                        dst[idx] = __hgt(x, zero) ? x : zero;
-                              }
-                              else {
-                                         const scalar_t zero = static_cast<scalar_t>(0.0f);
-                                        dst[idx] = (x > zero) ? x : zero;
-                              }
+                    if (idx >= N) return;
+
+                    scalar_t x = src[idx];
+
+                    if constexpr (std::is_same_v<scalar_t, __nv_bfloat16>
+#ifdef USE_TORCH
+                              || std::is_same_v<scalar_t, c10::BFloat16>
+#endif
+                              ) {
+                              const auto zero = __float2bfloat16(0.0f);
+                              dst[idx] = __hgt(x, zero) ? x : zero;
+                    }
+                    else if constexpr (std::is_same_v<scalar_t, __half>
+#ifdef USE_TORCH
+                              || std::is_same_v<scalar_t, c10::Half>
+#endif
+                              ) {
+                              const auto zero = __float2half(0.0f);
+                              dst[idx] = __hgt(x, zero) ? x : zero;
+                    }
+                    else {
+                              dst[idx] = (x > static_cast<scalar_t>(0)) ? x : static_cast<scalar_t>(0);
                     }
           }
 
 } // namespace cuda_operator
 
+#if defined(USE_TORCH) 
 torch::Tensor relu_f32(const torch::Tensor& src) {
 
           TORCH_CHECK(src.dtype() == torch::kFloat32,
@@ -104,3 +117,5 @@ torch::Tensor relu_generic(const torch::Tensor& src) {
 
           return dst;
 }
+
+#endif
