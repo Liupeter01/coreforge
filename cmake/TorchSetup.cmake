@@ -1,122 +1,144 @@
 # cmake/TorchSetup.cmake
 include_guard(GLOBAL)
-include(ExternalProject)
 
-option(USE_PYTHON_TORCH "Select PyTorch Installed in Python Env By Default" ON)
-set(LIBTORCH_VERSION
-    "2.11.0"
-    CACHE STRING "LibTorch Version(For Fallback Download)")
-set(TORCH_CUDA_VARIANT
-    "cu130"
-    CACHE STRING "cu126/cu128/cu130/cpu(For Fallback Download)")
-option(USE_DEBUG_TORCH
-       "Download Debug Version's' libTorch(Windows Platform Only)" OFF)
-option(USE_PYBIND11 "Enable pybind11 Supported Python extension" ON)
+option(USE_TORCH "Enable LibTorch / PyTorch support" OFF)
+option(USE_PYTHON_TORCH "Prefer PyTorch from Python environment" OFF)
+option(USE_PYBIND11 "Enable pybind11 Python extension" OFF)
+option(USE_DEBUG_TORCH "Download debug LibTorch (Windows only)" OFF)
 
-if(USE_PYTHON_TORCH)
-  find_package(Python3 COMPONENTS Interpreter)
-  if(Python3_FOUND)
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} -c
-              "import torch; print(torch.utils.cmake_prefix_path)"
-      RESULT_VARIABLE _python_torch_res
-      OUTPUT_VARIABLE TORCH_PREFIX
-      OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-    if(_python_torch_res EQUAL 0 AND TORCH_PREFIX)
-      list(PREPEND CMAKE_PREFIX_PATH ${TORCH_PREFIX})
-      message(STATUS "PyTorch inside Python has been found: ${TORCH_PREFIX}")
+set(LIBTORCH_VERSION "2.11.0" CACHE STRING "LibTorch version for fallback download")
+set(TORCH_CUDA_VARIANT "cu130" CACHE STRING "cu126/cu128/cu130/cpu for fallback download")
+
+# ---------------------------------------------------------------------------
+function(setup_torch)
+  # --- 1. Try Python environment first ---
+  if(USE_PYTHON_TORCH)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_FOUND)
+      execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c
+                "import torch; print(torch.utils.cmake_prefix_path)"
+        RESULT_VARIABLE _res
+        OUTPUT_VARIABLE _prefix
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+      if(_res EQUAL 0 AND _prefix)
+        list(PREPEND CMAKE_PREFIX_PATH "${_prefix}")
+        set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
+        message(STATUS "[Torch] Found PyTorch in Python env: ${_prefix}")
+      endif()
     endif()
   endif()
-endif()
 
-find_package(Torch QUIET)
+  find_package(Torch QUIET)
+  if(TORCH_FOUND)
+    _torch_propagate_to_parent()
+    return()
+  endif()
 
-if(NOT TORCH_FOUND)
-  message(
-    STATUS
-      "Python PyTorch Not Found → Auto Download LibTorch ${LIBTORCH_VERSION}+${TORCH_CUDA_VARIANT}"
-  )
+  # --- 2. Fallback: download LibTorch ---
+  message(STATUS "[Torch] Python PyTorch not found → downloading LibTorch "
+                  "${LIBTORCH_VERSION}+${TORCH_CUDA_VARIANT}")
+  _torch_download_libtorch()
 
+  # --- 3. CUDA toolkit + nvToolsExt shim ---
+  find_package(CUDAToolkit REQUIRED)
+  _torch_fix_nvtoolsext()
+
+  # --- 4. Final find (REQUIRED) ---
+  find_package(Torch REQUIRED)
+  _torch_propagate_to_parent()
+endfunction()
+
+# ---------------------------------------------------------------------------
+#  Internal helpers (prefixed with _ to signal private use)
+# ---------------------------------------------------------------------------
+function(_torch_download_libtorch)
   include(ExternalProject)
 
-  # 平台后缀
+  # Platform suffix + build type
   if(WIN32)
-    set(PLATFORM_SUFFIX "-win")
-
-    # ---------- Debug suffix(ONLY for windows) ----------
+    set(_suffix "-win")
     if(USE_DEBUG_TORCH)
-      set(BUILD_TYPE "debug")
+      set(_build "debug")
     else()
-      set(BUILD_TYPE "shared-with-deps")
+      set(_build "shared-with-deps")
     endif()
   elseif(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-    set(PLATFORM_SUFFIX "-macos-arm64")
-    set(TORCH_CUDA_VARIANT "cpu") # macOS ARM 无 CUDA
-    set(BUILD_TYPE "shared-with-deps")
+    set(_suffix "-macos-arm64")
+    set(TORCH_CUDA_VARIANT "cpu" PARENT_SCOPE)   # no CUDA on Apple Silicon
+    set(TORCH_CUDA_VARIANT "cpu")
+    set(_build "shared-with-deps")
   else()
-    set(PLATFORM_SUFFIX "")
-    set(BUILD_TYPE "shared-with-deps")
+    set(_suffix "")
+    set(_build "shared-with-deps")
   endif()
 
-  # ---------- generate url ----------
+  # URL
   if(TORCH_CUDA_VARIANT STREQUAL "cpu")
-    set(BASE_URL "https://download.pytorch.org/libtorch/cpu")
-    set(FILENAME
-        "libtorch${PLATFORM_SUFFIX}-${BUILD_TYPE}-${LIBTORCH_VERSION}.zip")
+    set(_url "https://download.pytorch.org/libtorch/cpu/libtorch${_suffix}-${_build}-${LIBTORCH_VERSION}.zip")
   else()
-    set(BASE_URL "https://download.pytorch.org/libtorch/${TORCH_CUDA_VARIANT}")
-    set(FILENAME
-        "libtorch${PLATFORM_SUFFIX}-${BUILD_TYPE}-${LIBTORCH_VERSION}%2B${TORCH_CUDA_VARIANT}.zip"
-    )
+    set(_url "https://download.pytorch.org/libtorch/${TORCH_CUDA_VARIANT}/libtorch${_suffix}-${_build}-${LIBTORCH_VERSION}%2B${TORCH_CUDA_VARIANT}.zip")
   endif()
-
-  set(LIBTORCH_URL "${BASE_URL}/${FILENAME}")
 
   ExternalProject_Add(
     libtorch
-    URL ${LIBTORCH_URL}
-    PREFIX ${CMAKE_BINARY_DIR}/_deps/libtorch
+    URL               "${_url}"
+    PREFIX            "${CMAKE_BINARY_DIR}/_deps/libtorch"
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ""
-    INSTALL_COMMAND "" DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    BUILD_COMMAND     ""
+    INSTALL_COMMAND   ""
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+
   ExternalProject_Get_Property(libtorch SOURCE_DIR)
-  list(PREPEND CMAKE_PREFIX_PATH ${SOURCE_DIR})
+  list(PREPEND CMAKE_PREFIX_PATH "${SOURCE_DIR}")
+  set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
 
-  message(STATUS "Download URL: ${LIBTORCH_URL}")
-  message(STATUS "Download Path: ${SOURCE_DIR}")
-endif()
+  message(STATUS "[Torch] Download URL : ${_url}")
+  message(STATUS "[Torch] Download path: ${SOURCE_DIR}")
+endfunction()
 
-find_package(CUDAToolkit REQUIRED)
+# ---------------------------------------------------------------------------
+function(_torch_fix_nvtoolsext)
+  if(TARGET CUDA::nvToolsExt)
+    return()
+  endif()
 
-# ----------------------- Fix CUDA 12+ nvToolsExt Problem
-# ----------------------------
-if(NOT TARGET CUDA::nvToolsExt)
   if(TARGET CUDA::nvtx3)
-    # CUDA 12: rename nvtx3's alias as nvToolsExt
     add_library(CUDA::nvToolsExt ALIAS CUDA::nvtx3)
-    message(STATUS "CUDA::nvToolsExt ALIAS as CUDA::nvtx3")
+    message(STATUS "[Torch] CUDA::nvToolsExt → alias to CUDA::nvtx3")
   else()
-    # fallback link manually
     add_library(CUDA::nvToolsExt INTERFACE IMPORTED)
     target_link_libraries(
       CUDA::nvToolsExt
       INTERFACE "${CUDAToolkit_LIBRARY_DIR}/nvToolsExt64_1.lib")
-    message(STATUS "CUDA::nvToolsExt INTERFACE target")
+    message(STATUS "[Torch] CUDA::nvToolsExt → manual interface target")
   endif()
-endif()
+endfunction()
 
-find_package(Torch REQUIRED)
-message(STATUS "Torch Setup Complete! Version: ${TORCH_VERSION}")
-message(STATUS "Torch Libraries: ${TORCH_LIBRARIES}")
-message(STATUS "Torch Include Dirs: ${TORCH_INCLUDE_DIRS}")
+# ---------------------------------------------------------------------------
+macro(_torch_propagate_to_parent)
+  set(TORCH_FOUND      "${TORCH_FOUND}"        PARENT_SCOPE)
+  set(TORCH_LIBRARIES  "${TORCH_LIBRARIES}"    PARENT_SCOPE)
+  set(TORCH_INCLUDE_DIRS "${TORCH_INCLUDE_DIRS}" PARENT_SCOPE)
+  set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
 
-if(USE_PYBIND11)
+  message(STATUS "[Torch] Version : ${TORCH_VERSION}")
+  message(STATUS "[Torch] Libraries : ${TORCH_LIBRARIES}")
+  message(STATUS "[Torch] Includes  : ${TORCH_INCLUDE_DIRS}")
 
-  find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
-
-  if(NOT Python3_FOUND)
-    message(FATAL_ERROR "Python Development Not Found!")
+  # Optional pybind11
+  if(USE_PYBIND11)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
+    message(STATUS "[Torch] Python dev: ${Python3_INCLUDE_DIRS}")
   endif()
+endmacro()
 
-  message(STATUS "Python Development Found: ${Python3_INCLUDE_DIRS}")
+# ===========================================================================
+#  Entry point — only runs when the gate is ON
+# ===========================================================================
+if(USE_TORCH)
+  setup_torch()
+else()
+  message(STATUS "[Torch] Disabled (USE_TORCH=OFF)")
 endif()
