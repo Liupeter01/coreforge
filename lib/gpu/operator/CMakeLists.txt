@@ -26,7 +26,15 @@ project(
 
 find_package(CUDA REQUIRED)
 
+if(USE_TORCH)
+    target_compile_definitions(gpu_operator PRIVATE USE_TORCH)
+endif()
+
 if(USE_PYBIND11)
+    target_compile_definitions(gpu_operator PRIVATE USE_PYBIND11)
+endif()
+
+if(USE_TORCH AND USE_PYBIND11)
 
   pybind11_add_module(gpu_operator MODULE ${source_file} ${header_file}
                       ${cuda_file})
@@ -43,9 +51,8 @@ if(USE_PYBIND11)
 
 else()
           add_library(cuda_operator STATIC ${source_file} ${header_file} ${cuda_file})
-          target_include_directories(cuda_operator PUBLIC include ${CUDA_INCLUDE_DIRS}
-                                                          ${TORCH_INCLUDE_DIRS})
-          target_link_libraries(cuda_operator PUBLIC libCudaUtilities ${TORCH_LIBRARIES})
+          target_include_directories(cuda_operator PUBLIC include ${CUDA_INCLUDE_DIRS})
+          target_link_libraries(cuda_operator PUBLIC libCudaUtilities)
           set_property(TARGET cuda_operator PROPERTY POSITION_INDEPENDENT_CODE ON)
           set_target_properties(cuda_operator PROPERTIES LINKER_LANGUAGE CXX)
 endif()
