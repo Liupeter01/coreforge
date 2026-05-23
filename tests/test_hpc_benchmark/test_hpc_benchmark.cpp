@@ -600,71 +600,71 @@ static void BM_YXx_blur_tiling_prefetch_streamed_IPL(benchmark::State &bm) {
   }
 }
 
-// hpc::HPCHighDimensionFlatArray<2, float, nblur, nblur, 32> a_avx(nx, ny);
-// hpc::HPCHighDimensionFlatArray<2, float, 0, 0, 32> b_avx(nx, ny);
+ hpc::HPCHighDimensionFlatArray<2, float, nblur, nblur, 32> a_avx(nx, ny);
+ hpc::HPCHighDimensionFlatArray<2, float, 0, 0, 32> b_avx(nx, ny);
 
-// static void BM_YXx_blur_tiling_prefetch_streamed_AVX2(benchmark::State &bm) {
-//   for (auto _ : bm) {
-// #pragma omp parallel for collapse(2)
-//     for (int y = 0; y < ny; ++y) {
-//       for (int x = 0; x < nx - 32 + 1; x += 32) {
-//         __m256 res[4];
-//         _mm_prefetch((const char *)&a_avx(y + nblur, x), _MM_HINT_T0);
-//         _mm_prefetch((const char *)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
-//         for (int offset = 0; offset < 4; ++offset) {
-//           res[offset] = _mm256_setzero_ps();
-//         }
+ static void BM_YXx_blur_tiling_prefetch_streamed_AVX2(benchmark::State &bm) {
+   for (auto _ : bm) {
+ #pragma omp parallel for collapse(2)
+     for (int y = 0; y < ny; ++y) {
+       for (int x = 0; x < nx - 32 + 1; x += 32) {
+         __m256 res[4];
+         _mm_prefetch((const char *)&a_avx(y + nblur, x), _MM_HINT_T0);
+         _mm_prefetch((const char *)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
+         for (int offset = 0; offset < 4; ++offset) {
+           res[offset] = _mm256_setzero_ps();
+         }
 
-//         for (int blur = -nblur; blur <= nblur; ++blur) {
-//           for (int offset = 0; offset < 4; ++offset) {
-//             res[offset] =
-//                 _mm256_add_ps(res[offset], _mm256_load_ps((const float
-//                 *)&a_avx(
-//                                                y + blur, x + offset * 8)));
-//           }
-//         }
-//         for (int offset = 0; offset < 4; offset++) {
-//           _mm256_stream_ps(&b_avx(y, x + offset * 8), res[offset]);
-//         }
-//       }
-//     }
-//     benchmark::DoNotOptimize(a);
-//   }
-// }
+         for (int blur = -nblur; blur <= nblur; ++blur) {
+           for (int offset = 0; offset < 4; ++offset) {
+             res[offset] =
+                 _mm256_add_ps(res[offset], _mm256_load_ps((const float
+                 *)&a_avx(
+                                                y + blur, x + offset * 8)));
+           }
+         }
+         for (int offset = 0; offset < 4; offset++) {
+           _mm256_stream_ps(&b_avx(y, x + offset * 8), res[offset]);
+         }
+       }
+     }
+     benchmark::DoNotOptimize(a);
+   }
+ }
 
-// static void
-// BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance(benchmark::State &bm) {
-//   for (auto _ : bm) {
-// #pragma omp parallel for collapse(2)
-//     for (int y = 0; y < ny; ++y) {
-//       for (int x = 0; x < nx - 32 + 1; x += 32) {
-//         __m256 res[4];
-//         _mm_prefetch((const char *)&a_avx(y + nblur, x + 32), _MM_HINT_T0);
-//         _mm_prefetch((const char *)&a_avx(y + nblur, x + 16 + 32),
-//         _MM_HINT_T0);
+ static void
+ BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance(benchmark::State &bm) {
+   for (auto _ : bm) {
+ #pragma omp parallel for collapse(2)
+     for (int y = 0; y < ny; ++y) {
+       for (int x = 0; x < nx - 32 + 1; x += 32) {
+         __m256 res[4];
+         _mm_prefetch((const char *)&a_avx(y + nblur, x + 32), _MM_HINT_T0);
+         _mm_prefetch((const char *)&a_avx(y + nblur, x + 16 + 32),
+         _MM_HINT_T0);
 
-//         for (int offset = 0; offset < 4; ++offset) {
-//           res[offset] = _mm256_setzero_ps();
-//         }
+         for (int offset = 0; offset < 4; ++offset) {
+           res[offset] = _mm256_setzero_ps();
+         }
 
-//         for (int blur = -nblur; blur <= nblur; ++blur) {
+         for (int blur = -nblur; blur <= nblur; ++blur) {
 
-//           for (int offset = 0; offset < 4; ++offset) {
-//             res[offset] =
-//                 _mm256_add_ps(res[offset], _mm256_load_ps((const float
-//                 *)&a_avx(
-//                                                y + blur, x + offset * 8)));
-//           }
-//         }
+           for (int offset = 0; offset < 4; ++offset) {
+             res[offset] =
+                 _mm256_add_ps(res[offset], _mm256_load_ps((const float
+                 *)&a_avx(
+                                                y + blur, x + offset * 8)));
+           }
+         }
 
-//         for (int offset = 0; offset < 4; offset++) {
-//           _mm256_stream_ps(&b_avx(y, x + offset * 8), res[offset]);
-//         }
-//       }
-//     }
-//     benchmark::DoNotOptimize(a);
-//   }
-// }
+         for (int offset = 0; offset < 4; offset++) {
+           _mm256_stream_ps(&b_avx(y, x + offset * 8), res[offset]);
+         }
+       }
+     }
+     benchmark::DoNotOptimize(a);
+   }
+ }
 
 hpc::HPCHighDimensionFlatArray<2, float> a_t(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b_t(nx, ny);
@@ -832,29 +832,29 @@ static void BM_conv_block_unroll(benchmark::State &bm) {
 constexpr int line = 1 << 23;
 std::vector<float> false_sharing(line);
 
-// static void BM_false_sharing(benchmark::State &bm) {
-//   for (auto _ : bm) {
-//     std::vector<int> temp(omp_get_max_threads());
-// #pragma omp parallel for
-//     for (int i = 0; i < line; ++i) {
-//       temp[omp_get_thread_num()] += false_sharing[i];
-//       benchmark::DoNotOptimize(temp);
-//     }
-//     benchmark::DoNotOptimize(temp);
-//   }
-// }
+ static void BM_false_sharing(benchmark::State &bm) {
+   for (auto _ : bm) {
+     std::vector<int> temp(omp_get_max_threads());
+ #pragma omp parallel for
+     for (int i = 0; i < line; ++i) {
+       temp[omp_get_thread_num()] += false_sharing[i];
+       benchmark::DoNotOptimize(temp);
+     }
+     benchmark::DoNotOptimize(temp);
+   }
+ }
 
-// static void BM_no_false_sharing(benchmark::State &bm) {
-//   for (auto _ : bm) {
-//     std::vector<int> temp(omp_get_max_threads() * 4096);
-// #pragma omp parallel for
-//     for (int i = 0; i < line; ++i) {
-//       temp[omp_get_thread_num() * 4096] += false_sharing[i];
-//       benchmark::DoNotOptimize(temp);
-//     }
-//     benchmark::DoNotOptimize(temp);
-//   }
-// }
+ static void BM_no_false_sharing(benchmark::State &bm) {
+   for (auto _ : bm) {
+     std::vector<int> temp(omp_get_max_threads() * 4096);
+ #pragma omp parallel for
+     for (int i = 0; i < line; ++i) {
+       temp[omp_get_thread_num() * 4096] += false_sharing[i];
+       benchmark::DoNotOptimize(temp);
+     }
+     benchmark::DoNotOptimize(temp);
+   }
+ }
 
 static void BM_RootHashDense(benchmark::State &bm) {
   for (auto _ : bm) {
@@ -1496,90 +1496,90 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
-// BENCHMARK(BM_AOS_partical);
-// BENCHMARK(BM_SOA_partical);
-// BENCHMARK(BM_AOSOA_partical);
-// BENCHMARK(BM_AOS_all_properties);
-// BENCHMARK(BM_SOA_all_properties);
-//
-// BENCHMARK(BM_ordered);
-// BENCHMARK(BM_random_64B);
-// BENCHMARK(BM_random_4096B);
-// BENCHMARK(BM_random_4KB_align);
-// BENCHMARK(BM_random_64B);
-// BENCHMARK(BM_random_64B_prefetch);
-//
-// BENCHMARK(BM_read_and_write);
-// BENCHMARK(BM_write);
+ BENCHMARK(BM_AOS_partical);
+ BENCHMARK(BM_SOA_partical);
+ BENCHMARK(BM_AOSOA_partical);
+ BENCHMARK(BM_AOS_all_properties);
+ BENCHMARK(BM_SOA_all_properties);
+
+ BENCHMARK(BM_ordered);
+ BENCHMARK(BM_random_64B);
+ BENCHMARK(BM_random_4096B);
+ BENCHMARK(BM_random_4KB_align);
+ BENCHMARK(BM_random_64B);
+ BENCHMARK(BM_random_64B_prefetch);
+
+ BENCHMARK(BM_read_and_write);
+ BENCHMARK(BM_write);
 BENCHMARK(BM_write_streamed);
 BENCHMARK(BM_write_streamed_and_read);
-//  BENCHMARK(BM_write_zero);
-//  BENCHMARK(BM_write_one);
-//  BENCHMARK(BM_java_style);
-//  BENCHMARK(BM_flat);
+  BENCHMARK(BM_write_zero);
+  BENCHMARK(BM_write_one);
+  //BENCHMARK(BM_java_style);
+  //BENCHMARK(BM_flat);
 
-// BENCHMARK(BM_x_blur);
-// BENCHMARK(BM_x_blur_prefetch);
-// BENCHMARK(BM_x_blur_cond_prefetch);
-// BENCHMARK(BM_x_blur_tiling_prefetch);
-// BENCHMARK(BM_x_blur_tiling_simd_prefetch);
+ BENCHMARK(BM_x_blur);
+ BENCHMARK(BM_x_blur_prefetch);
+ BENCHMARK(BM_x_blur_cond_prefetch);
+ BENCHMARK(BM_x_blur_tiling_prefetch);
+ BENCHMARK(BM_x_blur_tiling_simd_prefetch);
 
-// BENCHMARK(BM_y_blur);
-// BENCHMARK(BM_y_blur_tiling);
-// BENCHMARK(BM_XYx_blur_tiling);
-// BENCHMARK(BM_YXx_blur_tiling);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_merged);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_IPL);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance);
+ BENCHMARK(BM_y_blur);
+ BENCHMARK(BM_y_blur_tiling);
+ BENCHMARK(BM_XYx_blur_tiling);
+ BENCHMARK(BM_YXx_blur_tiling);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_merged);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_IPL);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2);
+ BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance);
 
-// BENCHMARK(BM_transpose);
-// BENCHMARK(BM_transpose_tiling);
-// BENCHMARK(BM_transpose_tiling_morton2d);
-// BENCHMARK(BM_transpose_tiling_morton2d_stream);
-// BENCHMARK(BM_transpose_tiling_tbb);
+ BENCHMARK(BM_transpose);
+ BENCHMARK(BM_transpose_tiling);
+ BENCHMARK(BM_transpose_tiling_morton2d);
+ BENCHMARK(BM_transpose_tiling_morton2d_stream);
+ BENCHMARK(BM_transpose_tiling_tbb);
 
-// BENCHMARK(BM_matrix_mul);
-// BENCHMARK(BM_matrix_mul_blocked);
+ BENCHMARK(BM_matrix_mul);
+ BENCHMARK(BM_matrix_mul_blocked);
 
-// BENCHMARK(BM_conv);
-// BENCHMARK(BM_conv_block);
-// BENCHMARK(BM_conv_block_unroll);
+ BENCHMARK(BM_conv);
+ BENCHMARK(BM_conv_block);
+ BENCHMARK(BM_conv_block_unroll);
 
-// BENCHMARK(BM_false_sharing);
-// BENCHMARK(BM_no_false_sharing);
+ BENCHMARK(BM_false_sharing);
+ BENCHMARK(BM_no_false_sharing);
 
-// BENCHMARK(BM_RootHashDense);
-// BENCHMARK(BM_RootPointerPointerDense);
-// BENCHMARK(BM_RootHashPointerDense);
-//
-// BENCHMARK(BM_int64_t);
-// BENCHMARK(BM_int32_t);
-// BENCHMARK(BM_int8_t);
-// BENCHMARK(BM_8bit);
-//
-// BENCHMARK(BM_double_calc);
-// BENCHMARK(BM_float_calc);
-//
-// BENCHMARK(BM_floatingpoint);
-// BENCHMARK(BM_fixedpoint_32);
-// BENCHMARK(BM_fixedpoint_16);
-// BENCHMARK(BM_fixedpoint_uint8);
+ BENCHMARK(BM_RootHashDense);
+ BENCHMARK(BM_RootPointerPointerDense);
+ BENCHMARK(BM_RootHashPointerDense);
 
-// BENCHMARK(BM_normal_wrong)->Threads(8);
-// BENCHMARK(BM_mutex)->Threads(8);
-// BENCHMARK(BM_spin_mutex)->Threads(8);
-// BENCHMARK(BM_atomic)->Threads(8);
-// BENCHMARK(BM_lockfree)->Threads(8);
+ BENCHMARK(BM_int64_t);
+ BENCHMARK(BM_int32_t);
+ BENCHMARK(BM_int8_t);
+ BENCHMARK(BM_8bit);
 
-// BENCHMARK(BM_std_sort);
-// BENCHMARK(BM_radix_v1);
-// BENCHMARK(BM_radix_v2);
-// BENCHMARK(BM_radix_v3);
-// BENCHMARK(BM_radix_v4);
-// BENCHMARK(BM_radix_sort_cache_v1);
-// BENCHMARK(BM_radix_sort_cache_thread_v1);
-// BENCHMARK(BM_radix_sort_cache_thread_v2);
+ BENCHMARK(BM_double_calc);
+ BENCHMARK(BM_float_calc);
+
+ BENCHMARK(BM_floatingpoint);
+ BENCHMARK(BM_fixedpoint_32);
+ BENCHMARK(BM_fixedpoint_16);
+ BENCHMARK(BM_fixedpoint_uint8);
+
+ BENCHMARK(BM_normal_wrong)->Threads(8);
+ BENCHMARK(BM_mutex)->Threads(8);
+ BENCHMARK(BM_spin_mutex)->Threads(8);
+ BENCHMARK(BM_atomic)->Threads(8);
+ BENCHMARK(BM_lockfree)->Threads(8);
+
+ BENCHMARK(BM_std_sort);
+ BENCHMARK(BM_radix_v1);
+ BENCHMARK(BM_radix_v2);
+ BENCHMARK(BM_radix_v3);
+ BENCHMARK(BM_radix_v4);
+ BENCHMARK(BM_radix_sort_cache_v1);
+ BENCHMARK(BM_radix_sort_cache_thread_v1);
+ BENCHMARK(BM_radix_sort_cache_thread_v2);
 BENCHMARK_MAIN();
