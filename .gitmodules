@@ -7,3 +7,7 @@
 [submodule "external/libmorton"]
 	path = external/libmorton
 	url = https://github.com/Forceflow/libmorton
+[submodule "external/pybind11"]
+	path = external/pybind11
+	url = https://github.com/pybind/pybind11
+	branch = stable
