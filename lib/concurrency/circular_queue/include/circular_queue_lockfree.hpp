@@ -17,7 +17,7 @@ public:
   ConcurrentCircularQueue()
       : m_max_size(_Size + 1),
         m_data(std::allocator<_Ty>::allocate(m_max_size)), m_tail(0),
-        m_head(0) {}
+        m_updated_tail(0), m_head(0) {}
   virtual ~ConcurrentCircularQueue() {
     for (std::size_t index = m_head; index != m_tail; index = next(index))
       std::allocator<_Ty>::destroy(m_data + index); //_Ty's dtor
