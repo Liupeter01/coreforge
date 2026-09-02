@@ -34,10 +34,12 @@ set(gtest_force_shared_crt
 FetchContent_MakeAvailable(googletest)
 
 # Universal Package
+add_subdirectory(test_hpc_array)
+add_subdirectory(test_sparse)
 add_subdirectory(test_hpc_benchmark)
 add_subdirectory(test_radixsort_cpu)
 
-if(CMAKE_CUDA_COMPILER)
+if(LIBHPC_HAS_CUDA)
   add_subdirectory(test_stall_lg_testsuite)
   add_subdirectory(test_overlap_pipeline_sweep_testsuite)
   add_subdirectory(test_compute_intensity_latency_sweep)

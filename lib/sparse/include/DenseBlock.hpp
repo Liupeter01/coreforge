@@ -2,8 +2,8 @@
 #ifndef _DENSEBLOCK_HPP_
 #define _DENSEBLOCK_HPP_
 #include <BaseBlock.hpp>
+#include <SparseBackend.hpp>
 #include <cassert>
-#include <tbb/concurrent_vector.h>
 
 namespace sparse {
 namespace details {
@@ -69,7 +69,7 @@ struct DenseBlock : BlockInfo<BlockSize, true, _Ty> {
     }
   }
 
-  tbb::concurrent_vector<_Ty> m_block;
+  details::ConcurrentSequence<_Ty> m_block;
 
 private:
   details::Coord2D getTransferredCoord(const std::intptr_t x,

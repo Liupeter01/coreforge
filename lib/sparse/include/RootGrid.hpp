@@ -1,8 +1,10 @@
 #pragma once
 #ifndef _ROOTGRID_HPP_
 #define _ROOTGRID_HPP_
+#include <cstdint>
 #include <iostream>
 #include <optional>
+#include <utility>
 
 namespace sparse {
 namespace details {
