@@ -1591,94 +1591,94 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
-// BENCHMARK(BM_AOS_partical);
-// BENCHMARK(BM_SOA_partical);
-// BENCHMARK(BM_AOSOA_partical);
-// BENCHMARK(BM_AOS_all_properties);
-// BENCHMARK(BM_SOA_all_properties);
+BENCHMARK(BM_AOS_partical);
+BENCHMARK(BM_SOA_partical);
+BENCHMARK(BM_AOSOA_partical);
+BENCHMARK(BM_AOS_all_properties);
+BENCHMARK(BM_SOA_all_properties);
 
-// BENCHMARK(BM_ordered);
-// BENCHMARK(BM_random_64B);
-// BENCHMARK(BM_random_4096B);
-// BENCHMARK(BM_random_4KB_align);
-// BENCHMARK(BM_random_64B);
-// BENCHMARK(BM_random_64B_prefetch);
+BENCHMARK(BM_ordered);
+BENCHMARK(BM_random_64B);
+BENCHMARK(BM_random_4096B);
+BENCHMARK(BM_random_4KB_align);
+BENCHMARK(BM_random_64B);
+BENCHMARK(BM_random_64B_prefetch);
 
-// BENCHMARK(BM_read_and_write);
-// BENCHMARK(BM_write);
-// BENCHMARK(BM_write_streamed);
-// BENCHMARK(BM_write_streamed_and_read);
-// BENCHMARK(BM_write_zero);
-// BENCHMARK(BM_write_one);
-// // BENCHMARK(BM_java_style);
-// // BENCHMARK(BM_flat);
+BENCHMARK(BM_read_and_write);
+BENCHMARK(BM_write);
+BENCHMARK(BM_write_streamed);
+BENCHMARK(BM_write_streamed_and_read);
+BENCHMARK(BM_write_zero);
+BENCHMARK(BM_write_one);
+// BENCHMARK(BM_java_style);
+// BENCHMARK(BM_flat);
 
-// BENCHMARK(BM_x_blur);
-// BENCHMARK(BM_x_blur_prefetch);
-// BENCHMARK(BM_x_blur_cond_prefetch);
-// BENCHMARK(BM_x_blur_tiling_prefetch);
-// BENCHMARK(BM_x_blur_tiling_simd_prefetch);
+BENCHMARK(BM_x_blur);
+BENCHMARK(BM_x_blur_prefetch);
+BENCHMARK(BM_x_blur_cond_prefetch);
+BENCHMARK(BM_x_blur_tiling_prefetch);
+BENCHMARK(BM_x_blur_tiling_simd_prefetch);
 
-// BENCHMARK(BM_y_blur);
-// BENCHMARK(BM_y_blur_tiling);
-// BENCHMARK(BM_XYx_blur_tiling);
-// BENCHMARK(BM_YXx_blur_tiling);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_merged);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_IPL);
-// #if defined(__x86_64__) || defined(_WIN64)
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2);
-// BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance);
-// #endif
+BENCHMARK(BM_y_blur);
+BENCHMARK(BM_y_blur_tiling);
+BENCHMARK(BM_XYx_blur_tiling);
+BENCHMARK(BM_YXx_blur_tiling);
+BENCHMARK(BM_YXx_blur_tiling_prefetch);
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed);
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_merged);
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_IPL);
+#if defined(__x86_64__) || defined(_WIN64)
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2);
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance);
+#endif
 
-// BENCHMARK(BM_transpose);
-// BENCHMARK(BM_transpose_tiling);
-// BENCHMARK(BM_transpose_tiling_morton2d);
-// BENCHMARK(BM_transpose_tiling_morton2d_stream);
-// #if LIBHPC_USE_TBB
-// BENCHMARK(BM_transpose_tiling_tbb);
-// #endif
+BENCHMARK(BM_transpose);
+BENCHMARK(BM_transpose_tiling);
+BENCHMARK(BM_transpose_tiling_morton2d);
+BENCHMARK(BM_transpose_tiling_morton2d_stream);
+#if LIBHPC_USE_TBB
+BENCHMARK(BM_transpose_tiling_tbb);
+#endif
 
 BENCHMARK(BM_matrix_mul);
 BENCHMARK(BM_matrix_mul_blocked);
 
 BENCHMARK(BM_conv);
 BENCHMARK(BM_conv_block);
-// BENCHMARK(BM_conv_block_unroll);
+//BENCHMARK(BM_conv_block_unroll);
 
-// BENCHMARK(BM_false_sharing);
-// BENCHMARK(BM_no_false_sharing);
+BENCHMARK(BM_false_sharing);
+BENCHMARK(BM_no_false_sharing);
 
-// BENCHMARK(BM_RootHashDense);
-// BENCHMARK(BM_RootPointerPointerDense);
-// BENCHMARK(BM_RootHashPointerDense);
+BENCHMARK(BM_RootHashDense);
+BENCHMARK(BM_RootPointerPointerDense);
+BENCHMARK(BM_RootHashPointerDense);
 
-// BENCHMARK(BM_int64_t);
-// BENCHMARK(BM_int32_t);
-// BENCHMARK(BM_int8_t);
-// BENCHMARK(BM_8bit);
+BENCHMARK(BM_int64_t);
+BENCHMARK(BM_int32_t);
+BENCHMARK(BM_int8_t);
+BENCHMARK(BM_8bit);
 
-// BENCHMARK(BM_double_calc);
-// BENCHMARK(BM_float_calc);
+BENCHMARK(BM_double_calc);
+BENCHMARK(BM_float_calc);
 
-// BENCHMARK(BM_floatingpoint);
-// BENCHMARK(BM_fixedpoint_32);
-// BENCHMARK(BM_fixedpoint_16);
-// BENCHMARK(BM_fixedpoint_uint8);
+BENCHMARK(BM_floatingpoint);
+BENCHMARK(BM_fixedpoint_32);
+BENCHMARK(BM_fixedpoint_16);
+BENCHMARK(BM_fixedpoint_uint8);
 
-// BENCHMARK(BM_normal_wrong)->Threads(8);
-// BENCHMARK(BM_mutex)->Threads(8);
-// BENCHMARK(BM_spin_mutex)->Threads(8);
-// BENCHMARK(BM_atomic)->Threads(8);
-// BENCHMARK(BM_lockfree)->Threads(8);
+BENCHMARK(BM_normal_wrong)->Threads(8);
+BENCHMARK(BM_mutex)->Threads(8);
+BENCHMARK(BM_spin_mutex)->Threads(8);
+BENCHMARK(BM_atomic)->Threads(8);
+BENCHMARK(BM_lockfree)->Threads(8);
 
-// BENCHMARK(BM_std_sort);
-// BENCHMARK(BM_radix_v1);
-// BENCHMARK(BM_radix_v2);
-// BENCHMARK(BM_radix_v3);
-// BENCHMARK(BM_radix_v4);
-// BENCHMARK(BM_radix_sort_cache_v1);
-// BENCHMARK(BM_radix_sort_cache_thread_v1);
-// BENCHMARK(BM_radix_sort_cache_thread_v2);
+BENCHMARK(BM_std_sort);
+BENCHMARK(BM_radix_v1);
+BENCHMARK(BM_radix_v2);
+BENCHMARK(BM_radix_v3);
+BENCHMARK(BM_radix_v4);
+BENCHMARK(BM_radix_sort_cache_v1);
+BENCHMARK(BM_radix_sort_cache_thread_v1);
+BENCHMARK(BM_radix_sort_cache_thread_v2);
 BENCHMARK_MAIN();
