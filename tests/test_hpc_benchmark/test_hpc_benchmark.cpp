@@ -3,10 +3,30 @@
 #include <benchmark/benchmark.h>
 #include <cmath>
 #include <libmorton/morton.h>
+#include <mutex>
+
+#ifndef LIBHPC_USE_OPENMP
+#define LIBHPC_USE_OPENMP 0
+#endif
+
+#if LIBHPC_USE_OPENMP
 #include <omp.h>
+#else
+inline int omp_get_max_threads() noexcept { return 1; }
+inline int omp_get_thread_num() noexcept { return 0; }
+inline void omp_set_num_threads(int) noexcept {}
+#endif
+
+#ifndef LIBHPC_USE_TBB
+#define LIBHPC_USE_TBB 0
+#endif
+
+#if LIBHPC_USE_TBB
 #include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
 #include <tbb/spin_mutex.h>
+#endif
+
 #include <vector>
 #if defined(__x86_64__) || defined(_WIN64)
 #include <immintrin.h>
@@ -642,6 +662,7 @@ static void BM_YXx_blur_tiling_prefetch_streamed_IPL(benchmark::State &bm) {
   }
 }
 
+#if defined(__x86_64__) || defined(_WIN64)
  hpc::HPCHighDimensionFlatArray<2, float, nblur, nblur, 32> a_avx(nx, ny);
  hpc::HPCHighDimensionFlatArray<2, float, 0, 0, 32> b_avx(nx, ny);
 
@@ -707,6 +728,7 @@ static void BM_YXx_blur_tiling_prefetch_streamed_IPL(benchmark::State &bm) {
      benchmark::DoNotOptimize(a);
    }
  }
+#endif
 
 hpc::HPCHighDimensionFlatArray<2, float> a_t(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b_t(nx, ny);
@@ -775,6 +797,7 @@ static void BM_transpose_tiling_morton2d_stream(benchmark::State &bm) {
   }
 }
 
+#if LIBHPC_USE_TBB
 static void BM_transpose_tiling_tbb(benchmark::State &bm) {
   for (auto _ : bm) {
     tbb::parallel_for(
@@ -790,6 +813,7 @@ static void BM_transpose_tiling_tbb(benchmark::State &bm) {
     benchmark::DoNotOptimize(b_t);
   }
 }
+#endif
 
 constexpr int size = 1 << 10;
 constexpr int matrix_block = 32;
@@ -1138,7 +1162,12 @@ static void BM_fixedpoint_uint8(benchmark::State &bm) {
 static constexpr std::size_t max_n = 1 << 24;
 std::atomic_bool flag;
 std::mutex mutex;
-tbb::spin_mutex spin;
+#if LIBHPC_USE_TBB
+using BenchmarkSpinMutex = tbb::spin_mutex;
+#else
+using BenchmarkSpinMutex = std::mutex;
+#endif
+BenchmarkSpinMutex spin;
 
 static void BM_normal_wrong(benchmark::State &bm) {
   for (auto _ : bm) {
@@ -1165,7 +1194,7 @@ static void BM_spin_mutex(benchmark::State &bm) {
   for (auto _ : bm) {
     std::size_t counter{};
     for (std::size_t i = 0; i < max_n; ++i) {
-      std::lock_guard<tbb::spin_mutex> _(spin);
+      std::lock_guard<BenchmarkSpinMutex> _(spin);
       counter++;
     }
     benchmark::DoNotOptimize(counter);
@@ -1603,14 +1632,18 @@ BENCHMARK(BM_write_streamed_and_read);
  BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed);
  BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_merged);
  BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_IPL);
+#if defined(__x86_64__) || defined(_WIN64)
  BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2);
  BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance);
+#endif
 
  BENCHMARK(BM_transpose);
  BENCHMARK(BM_transpose_tiling);
  BENCHMARK(BM_transpose_tiling_morton2d);
  BENCHMARK(BM_transpose_tiling_morton2d_stream);
+#if LIBHPC_USE_TBB
  BENCHMARK(BM_transpose_tiling_tbb);
+#endif
 
  BENCHMARK(BM_matrix_mul);
  BENCHMARK(BM_matrix_mul_blocked);
