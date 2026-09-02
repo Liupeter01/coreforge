@@ -1,6 +1,8 @@
 #pragma once
 #ifndef _BASEBLOCK_HPP_
 #define _BASEBLOCK_HPP_
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <type_traits>
