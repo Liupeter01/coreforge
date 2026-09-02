@@ -9,6 +9,7 @@
 #define _HPC_HIGH_DIMENSION_FLAT_ARRAY_HPP_
 
 #include <AlignedAlloc.hpp>
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <vector>
@@ -98,7 +99,7 @@ public:
   constexpr const _Ty *data() const noexcept { return _flat.data(); }
 
   void zero() {
-            _flat.clear();
+    std::fill(_flat.begin(), _flat.end(), _Ty{});
   }
 
   /**

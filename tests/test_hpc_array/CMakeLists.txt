@@ -1,0 +1,4 @@
+add_executable(test_hpc_array test_hpc_array.cpp)
+target_link_libraries(test_hpc_array PRIVATE hpc_array)
+
+add_test(NAME hpc_array_zero_and_alignment COMMAND test_hpc_array)
