@@ -2,9 +2,15 @@
 #ifndef _HASHBLOCK_HPP_
 #define _HASHBLOCK_HPP_
 #include <BaseBlock.hpp>
+#include <SparseBackend.hpp>
+#include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
+#include <vector>
+
+#if LIBHPC_USE_TBB
 #include <tbb/concurrent_hash_map.h>
-#include <tbb/concurrent_vector.h>
-#include <tbb/parallel_for.h>
+#endif
 
 namespace sparse {
 namespace details {
@@ -26,6 +32,10 @@ struct Coord2D_HashCompare {
   static bool equal(const details::Coord2D &a, const details::Coord2D &b) {
     return a == b;
   }
+
+  std::size_t operator()(const details::Coord2D &key) const {
+    return hash(key);
+  }
 };
 
 } // namespace details
@@ -39,12 +49,19 @@ struct HashBlock
   using reference = OtherBlock &;
   using const_value = const OtherBlock;
   using CurrBlockType = BlockInfo<1, false, OtherBlock>;
+
+#if LIBHPC_USE_TBB
   using ContainerType =
       tbb::concurrent_hash_map<details::Coord2D, std::unique_ptr<OtherBlock>,
                                details::Coord2D_HashCompare>;
 
   using ContainerAccessor = typename ContainerType::accessor;
   using ConstContainerAccessor = typename ContainerType::const_accessor;
+#else
+  using ContainerType =
+      std::unordered_map<details::Coord2D, std::unique_ptr<OtherBlock>,
+                         details::Coord2D_HashCompare>;
+#endif
 
   /*related to subblock, we need its offset argument*/
   static constexpr std::intptr_t subblock_shift_bits =
@@ -53,21 +70,39 @@ struct HashBlock
   virtual std::optional<std::reference_wrapper<value_type>>
   operator()(const std::intptr_t x, const std::intptr_t y) override {
     auto key = getKey(x, y);
+#if LIBHPC_USE_TBB
     ContainerAccessor accessor;
     if (!m_data.find(accessor, key)) {
       return std::nullopt;
     }
     return std::ref(*accessor->second); // accessor acts like iterator
+#else
+    std::shared_lock lock(m_mutex);
+    auto it = m_data.find(key);
+    if (it == m_data.end()) {
+      return std::nullopt;
+    }
+    return std::ref(*it->second);
+#endif
   }
 
   virtual std::optional<std::reference_wrapper<const_value>>
   operator()(const std::intptr_t x, const std::intptr_t y) const override {
     auto key = getKey(x, y);
+#if LIBHPC_USE_TBB
     ConstContainerAccessor accessor;
     if (!m_data.find(accessor, key)) {
       return std::nullopt;
     }
     return std::cref(*accessor->second);
+#else
+    std::shared_lock lock(m_mutex);
+    auto it = m_data.find(key);
+    if (it == m_data.end()) {
+      return std::nullopt;
+    }
+    return std::cref(*it->second);
+#endif
   }
 
   virtual std::optional<std::reference_wrapper<const_value>>
@@ -92,6 +127,7 @@ struct HashBlock
   virtual std::reference_wrapper<value_type>
   touch_pointer(const std::intptr_t x, const std::intptr_t y) override {
     auto key = getKey(x, y);
+#if LIBHPC_USE_TBB
     ContainerAccessor accessor;
     m_data.insert(accessor, key);
 
@@ -99,9 +135,18 @@ struct HashBlock
       accessor->second = std::make_unique<OtherBlock>();
     }
     return std::ref(*accessor->second);
+#else
+    std::unique_lock lock(m_mutex);
+    auto [it, inserted] = m_data.try_emplace(key);
+    if (inserted || !it->second) {
+      it->second = std::make_unique<OtherBlock>();
+    }
+    return std::ref(*it->second);
+#endif
   }
 
   template <typename Func> void foreach (Func &&func) {
+#if LIBHPC_USE_TBB
     std::vector<details::Coord2D> keys;
     keys.reserve(m_data.size());
 
@@ -109,15 +154,32 @@ struct HashBlock
       keys.push_back(it->first);
     }
     auto size = keys.size();
-    tbb::parallel_for(std::size_t(0), size, [&](std::size_t i) {
+    details::parallel_for(std::size_t(0), size, [&](std::size_t i) {
       ContainerAccessor acc;
       if (m_data.find(acc, keys[i])) {
         func(acc->first.first, acc->first.second, *acc->second);
       }
     });
+#else
+    std::vector<std::pair<details::Coord2D, OtherBlock *>> entries;
+    {
+      std::shared_lock lock(m_mutex);
+      entries.reserve(m_data.size());
+      for (auto &[key, value] : m_data) {
+        entries.emplace_back(key, value.get());
+      }
+    }
+    for (auto &[key, value] : entries) {
+      func(key.first, key.second, *value);
+    }
+#endif
   }
 
   ContainerType m_data;
+
+#if !LIBHPC_USE_TBB
+  mutable std::shared_mutex m_mutex;
+#endif
 
 private:
   details::Coord2D getKey(const std::intptr_t x, const std::intptr_t y) const {
