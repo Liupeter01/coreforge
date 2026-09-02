@@ -97,6 +97,10 @@ public:
    */
   constexpr const _Ty *data() const noexcept { return _flat.data(); }
 
+  void zero() {
+            _flat.clear();
+  }
+
   /**
    * @brief Accesses an element using a dimension array with bounds checking.
    *
