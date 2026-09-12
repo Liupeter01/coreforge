@@ -16,7 +16,7 @@ endif()
 file(GLOB_RECURSE source_file CONFIGURE_DEPENDS src/*.cpp src/*.cc src/*.c)
 file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
-set(CUDA_FILE src/cp_async_copy.cu)
+set(CUDA_FILE include/cp_async_copy.cuh src/dummy.cu)
 
 project(
   libCpAsyncCopyTest
