@@ -24,32 +24,56 @@ TEST_P(Unified, DifferentShapes) {
   if (!a.empty())
     check(cudaMemcpy(da.ptr, a.data(), a.size() * sizeof(float),
                      cudaMemcpyHostToDevice));
+
   if (!b.empty())
     check(cudaMemcpy(db.ptr, b.data(), b.size() * sizeof(float),
                      cudaMemcpyHostToDevice));
 
+  float elapsed_ms = 0.0f;
+
   if (m && n) {
-    gemm_unified_double_buffer<<<dim3((n + 15) / 16, (m + 15) / 16),
-                                 dim3(16, 16)>>>(da.ptr, db.ptr, dc.ptr, m, n,
-                                                 k);
+    cudaEvent_t start, stop;
+    check(cudaEventCreate(&start));
+    check(cudaEventCreate(&stop));
+
+    dim3 grid((n + 15) / 16, (m + 15) / 16);
+    dim3 block(16, 16);
+
+    check(cudaEventRecord(start));
+
+    gemm_unified_double_buffer<<<grid, block>>>(da.ptr, db.ptr, dc.ptr, m, n,
+                                                k);
+
     check(cudaGetLastError());
-    check(cudaDeviceSynchronize());
+
+    check(cudaEventRecord(stop));
+    check(cudaEventSynchronize(stop));
+
+    check(cudaEventElapsedTime(&elapsed_ms, start, stop));
+
+    check(cudaEventDestroy(start));
+    check(cudaEventDestroy(stop));
+
+    std::cout << "GEMM " << m << "x" << n << "x" << k << ": " << elapsed_ms
+              << " ms\n";
+
     check(cudaMemcpy(c.data(), dc.ptr, c.size() * sizeof(float),
                      cudaMemcpyDeviceToHost));
   }
 
-  for (int col = 0; col < n; ++col) {
-    double expected = 0;
-    for (int kk = 0; kk < k; ++kk)
-      expected +=
-          double(a[std::size_t(row) * k + kk]) * b[std::size_t(kk) * n + col];
+  for (size_t row = 0; row < m; ++row) {
+    for (size_t col = 0; col < n; ++col) {
+      double expected = 0;
 
-    const float actual = c[std::size_t(row) * n + col];
+      for (size_t kk = 0; kk < k; ++kk)
+        expected += double(a[row * k + kk]) * b[kk * n + col];
 
-    ASSERT_EQ(expected, actual);
-    if (!std::isfinite(actual) ||
-        std::abs(actual - expected) > 1e-4 * (1 + std::abs(expected)))
-      throw std::runtime_error("GEMM mismatch");
+      const float actual = c[row * n + col];
+
+      ASSERT_TRUE(std::isfinite(actual));
+
+      ASSERT_NEAR(expected, actual, 1e-4 * (1 + std::abs(expected)));
+    }
   }
 }
 

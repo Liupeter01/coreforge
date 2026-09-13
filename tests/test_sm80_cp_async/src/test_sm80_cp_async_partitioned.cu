@@ -20,12 +20,34 @@ TEST_P(Partitioned, DifferentLengths) {
     in[i] = float(int(i % 31) - 15);
 
   DeviceBuffer di(length), dout(length);
+
+  float elapsed_ms = 0.0f;
+
   if (length) {
     check(cudaMemcpy(di.ptr, in.data(), length * sizeof(float),
                      cudaMemcpyHostToDevice));
+
+    cudaEvent_t start, stop;
+    check(cudaEventCreate(&start));
+    check(cudaEventCreate(&stop));
+
+    check(cudaEventRecord(start));
+
     scale_partitioned_double_buffer<<<grid, 128>>>(di.ptr, dout.ptr, length);
+
     check(cudaGetLastError());
-    check(cudaDeviceSynchronize());
+
+    check(cudaEventRecord(stop));
+    check(cudaEventSynchronize(stop));
+
+    check(cudaEventElapsedTime(&elapsed_ms, start, stop));
+
+    check(cudaEventDestroy(start));
+    check(cudaEventDestroy(stop));
+
+    std::cout << "grid=" << grid << ", length=" << length << ": "
+              << elapsed_ms * 1000.0f << " us\n";
+
     check(cudaMemcpy(out.data(), dout.ptr, length * sizeof(float),
                      cudaMemcpyDeviceToHost));
   }
