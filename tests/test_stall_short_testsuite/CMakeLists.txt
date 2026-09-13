@@ -16,9 +16,13 @@ project(
   VERSION 0.0.1
   LANGUAGES C CXX CUDA)
 
-file(GLOB TEST_SOURCES *.cc *.cpp)
+file(GLOB_RECURSE source_file CONFIGURE_DEPENDS src/*.cpp src/*.cc src/*.c)
+file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
-add_executable(test_stall_short_testsuite ${TEST_SOURCES})
+set(CUDA_FILE src/baseline.cu src/dim3.cu src/dim3_shared.cu src/solve_conflict.cu include/common.cuh src/register.cu) 
+find_package(CUDA REQUIRED)
+
+add_executable(test_stall_short_testsuite ${source_file} ${header_file} ${CUDA_FILE})
 target_include_directories(test_stall_short_testsuite PUBLIC include)
 
-target_link_libraries(test_stall_short_testsuite PUBLIC libStallShortTest)
+target_link_libraries(test_stall_short_testsuite PUBLIC libStallShortTest libCudaUtilities)
