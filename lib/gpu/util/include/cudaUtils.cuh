@@ -11,7 +11,7 @@ namespace util {
 // output nx rows, ny columns;
 // block is BlockSize × BlockSize
 template <typename _Ty, std::size_t BlockSize>
-__global__ void parallel_transpose(_Ty *out, const _Ty *in, int nx, int ny) {
+__global__ void kernel_transpose(_Ty *out, const _Ty *in, int nx, int ny) {
   int x = blockIdx.x * BlockSize + threadIdx.x;
   int y = blockIdx.y * BlockSize + threadIdx.y;
   int rx = blockIdx.y * BlockSize + threadIdx.x;
