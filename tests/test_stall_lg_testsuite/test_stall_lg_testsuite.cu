@@ -39,11 +39,10 @@ int main() {
     launch();
 
     auto err = cudaGetLastError();
-    check(err);
+    ASSERT_EQ(err, cudaSuccess);
 
     cudaEventRecord(stop);
 
-    // 等待 stop event，也就等于等待前面的 kernel 完成
     cudaEventSynchronize(stop);
 
     float ms = 0.0f;
