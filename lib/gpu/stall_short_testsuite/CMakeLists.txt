@@ -16,7 +16,7 @@ endif()
 file(GLOB_RECURSE source_file CONFIGURE_DEPENDS src/*.cpp src/*.cc src/*.c)
 file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
-set(CUDA_FILE include/cuda_tut_stall_short.cuh src/cuda_tut_stall_short.cu)
+set(CUDA_FILE include/cuda_tut_stall_short.cuh src/dummy.cu)
 
 project(
   libStallShortTest
