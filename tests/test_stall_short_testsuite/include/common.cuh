@@ -6,14 +6,15 @@
 #include <nvtx3/nvToolsExt.h>
 
 #include <cstddef>
+#include <cudaAllocator.hpp>
+#include <cuda_tut_stall_short.cuh>
 #include <tuple>
 #include <vector>
-#include <cuda_tut_stall_short.cuh>
-#include <cudaAllocator.hpp>
 
 using TransposeParam = std::tuple<int, int>;
 
-class TestStallShortTestSuite : public ::testing::TestWithParam<TransposeParam> {
+class TestStallShortTestSuite
+    : public ::testing::TestWithParam<TransposeParam> {
 protected:
   static constexpr int BlockSize = 32;
 
