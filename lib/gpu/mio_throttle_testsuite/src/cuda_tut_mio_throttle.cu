@@ -30,7 +30,7 @@ __global__ void stall_mio_better() {
 
   __syncthreads();
   for (int i = 0; i < 32; ++i)
-    block2[i][id] = block1[id][i]; // 同一 warp 连续写，读仍有冲突
+    block2[i][id] = block1[id][i]; // read contention
   __syncthreads();
 }
 
@@ -47,6 +47,6 @@ __global__ void stall_mio_good() {
   __syncthreads();
 
   for (int i = 0; i < 32; ++i)
-    block2[i][id] = block1[id][i]; // stride=33 已打散 bank，无需 i+1
+    block2[i][id] = block1[id][i]; // stride=33
   __syncthreads();
 }
