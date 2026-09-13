@@ -50,6 +50,7 @@ if(LIBHPC_HAS_CUDA)
   add_subdirectory(test_radixsort_gpu_global_offset)
   add_subdirectory(test_radixsort_gpu_local_count)
   add_subdirectory(test_radixsort_gpu_local_offset)
+  add_subdirectory(test_sm80_cp_async)
 endif()
 
 # Only enable in debug mode!
