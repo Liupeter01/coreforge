@@ -1,7 +1,7 @@
 #include <cuda_runtime.h>
 #include <cuda_tut_mio_throttle.cuh>
 #include <gtest/gtest.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 TEST(StallMioTest, Worse) {
   float ms;
@@ -41,7 +41,7 @@ TEST(StallMioTest, Better) {
   printf("Current Test is: %s\n", "stall_mio_better");
   nvtxRangePushA("stall_mio_better");
 
-  stall_mio_better < <<1024, 32>>();
+  stall_mio_better<<<1024, 32>>>();
 
   nvtxRangePop();
 
