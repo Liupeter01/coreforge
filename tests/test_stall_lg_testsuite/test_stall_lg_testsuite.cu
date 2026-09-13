@@ -1,6 +1,6 @@
 #include <cudaAllocator.hpp>
-#include <gtest/gtest.h>
 #include <cuda_tut_stall_lg.cuh>
+#include <gtest/gtest.h>
 #include <vector>
 
 int main() {
@@ -20,20 +20,58 @@ int main() {
     err = cudaDeviceSynchronize(); // read array from gpu, we need this
     if (err != cudaSuccess)
       throw std::runtime_error(cudaGetErrorString(err));
-    for (std::size_t i = 0; i < bytes; ++i)
+    for (std::size_t i = 0; i < bytes; ++i) {
       ASSERT_EQ(stall_out[i], stall_in[i]);
-    if (stall_out[i] != stall_in[i])
-      throw std::runtime_error("copy result mismatch");
+      if (stall_out[i] != stall_in[i])
+        throw std::runtime_error("copy result mismatch");
+    }
     std::fill(stall_out.begin(), stall_out.end(), int8_t{0});
   };
 
-  stall_lg_worse<<<Grid, Block>>>(stall_in.data(), stall_out.data());
-  check_copy();
-  stall_lg_coalesced_32<<<Grid, Block>>>(stall_in.data(), stall_out.data());
-  check_copy();
-  stall_lg_coalesced_128<<<Grid, Block>>>(stall_in.data(), stall_out.data());
-  check_copy();
-  stall_lg_coalesced_512<<<Grid, Block>>>(stall_in.data(),
-                                               stall_out.data());
-  check_copy();
+  auto time_kernel = [&](const char *name, auto &&launch) {
+    cudaEvent_t start, stop;
+
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
+    launch();
+
+    auto err = cudaGetLastError();
+    check(err);
+
+    cudaEventRecord(stop);
+
+    // 等待 stop event，也就等于等待前面的 kernel 完成
+    cudaEventSynchronize(stop);
+
+    float ms = 0.0f;
+    cudaEventElapsedTime(&ms, start, stop);
+
+    std::cout << name << ": " << ms << " ms\n";
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    check_copy();
+  };
+
+  time_kernel("stall_lg_worse", [&] {
+    stall_lg_worse<<<Grid, Block>>>(stall_in.data(), stall_out.data());
+  });
+
+  time_kernel("stall_lg_coalesced_32", [&] {
+    stall_lg_coalesced_32<<<Grid, Block>>>(stall_in.data(), stall_out.data());
+  });
+
+  time_kernel("stall_lg_coalesced_128", [&] {
+    stall_lg_coalesced_128<<<Grid, Block>>>(stall_in.data(), stall_out.data());
+  });
+
+  time_kernel("stall_lg_coalesced_512", [&] {
+    stall_lg_coalesced_512<<<Grid, Block>>>(stall_in.data(), stall_out.data());
+  });
+
+  return 0;
 }
