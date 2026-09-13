@@ -70,7 +70,7 @@ template <typename _Ty, typename _Strategy> struct CudaAllocator {
     return static_cast<_Ty *>(ptr);
   }
   void deallocate(_Ty *ptr, std::size_t size = 0) {
-    checkCuda(strat_.free(ptr));
+            cudahelper::checkCuda(strat_.free(ptr));
   }
   template <typename... Args> void construct(_Ty *p, Args &&...args) {
     if constexpr (!(sizeof...(args) == 0 && std::is_pod_v<_Ty>))
