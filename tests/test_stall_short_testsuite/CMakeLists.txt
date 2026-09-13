@@ -26,7 +26,7 @@ set(gtest_force_shared_crt
 file(GLOB_RECURSE source_file CONFIGURE_DEPENDS src/*.cpp src/*.cc src/*.c)
 file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
-set(CUDA_FILE src/baseline.cu src/dim3.cu src/dim3_shared.cu src/solve_conflict.cu include/common.cuh src/register.cu) 
+set(CUDA_FILE src/dim3_shared.cu src/solve_conflict.cu include/common.cuh src/register.cu) 
 
 add_executable(test_stall_short_testsuite ${source_file} ${header_file} ${CUDA_FILE})
 target_include_directories(test_stall_short_testsuite PUBLIC include ${CUDA_INCLUDE_DIRS})
