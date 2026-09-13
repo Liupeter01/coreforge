@@ -105,6 +105,7 @@ __global__ void scale_partitioned_double_buffer(const float *in, float *out,
   auto pipe = cuda::make_pipeline(block, &state, cuda::std::size_t{Producers});
   const std::size_t tiles = n / Tile + (n % Tile != 0);
 
+  //producer only
   if (tid < Producers) {
     std::size_t batch = 0;
     for (std::size_t tile = blockIdx.x; tile < tiles;
@@ -123,7 +124,10 @@ __global__ void scale_partitioned_double_buffer(const float *in, float *out,
 
       pipe.producer_commit();
     }
-  } else {
+  } 
+  else 
+  {
+    //consumer only!
     const int consumer_rank = tid - Producers;
     std::size_t batch = 0;
     for (std::size_t tile = blockIdx.x; tile < tiles;
