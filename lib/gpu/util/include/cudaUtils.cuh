@@ -6,33 +6,26 @@
 
 namespace gpu {
 namespace util {
+
+// input ny rows, nx columns
+// output nx rows, ny columns;
+// block is BlockSize × BlockSize
 template <typename _Ty, std::size_t BlockSize>
-__global__ void kernel_transpose(_Ty *__restrict out, const _Ty *__restrict in,
-                                 const uint32_t width, const uint32_t height) {
-
-  // before transpose
-  const uint32_t x = blockIdx.x * BlockSize + threadIdx.x;
-  const uint32_t y = blockIdx.y * BlockSize + threadIdx.y;
-
+__global__ void parallel_transpose(_Ty *out, const _Ty *in, int nx, int ny) {
+  int x = blockIdx.x * BlockSize + threadIdx.x;
+  int y = blockIdx.y * BlockSize + threadIdx.y;
+  int rx = blockIdx.y * BlockSize + threadIdx.x;
+  int ry = blockIdx.x * BlockSize + threadIdx.y;
   __shared__ volatile _Ty tile[BlockSize][BlockSize + 1];
-
-  _Ty value = _Ty(0);
-  if (x < width && y < height) {
-    value = in[y * width + x];
-  }
-
-  // after transpose, we move calculation here to cover memory latency
-  const uint32_t tx = blockIdx.y * BlockSize + threadIdx.x;
-  const uint32_t ty = blockIdx.x * BlockSize + threadIdx.y;
-
-  tile[threadIdx.y][threadIdx.x] = value;
+  if (x < nx && y < ny)
+    tile[threadIdx.y][threadIdx.x] = in[std::size_t(y) * nx + x];
 
   __syncthreads();
 
-  if (tx < height && ty < width) {
-    out[ty * height + tx] = tile[threadIdx.x][threadIdx.y];
-  }
+  if (rx < ny && ry < nx)
+    out[std::size_t(ry) * ny + rx] = tile[threadIdx.x][threadIdx.y];
 }
+
 } // namespace util
 } // namespace gpu
 
