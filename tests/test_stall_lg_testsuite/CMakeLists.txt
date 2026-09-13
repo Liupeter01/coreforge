@@ -17,8 +17,9 @@ project(
   LANGUAGES C CXX CUDA)
 
 file(GLOB TEST_SOURCES *.cc *.cpp)
+set(CUDA_FILE test_stall_lg_testsuite.cu)
 
-add_executable(test_stall_lg_testsuite ${TEST_SOURCES})
+add_executable(test_stall_lg_testsuite ${TEST_SOURCES} ${CUDA_FILE})
 target_include_directories(test_stall_lg_testsuite PUBLIC include)
 
-target_link_libraries(test_stall_lg_testsuite PUBLIC libStallLGTest)
+target_link_libraries(test_stall_lg_testsuite PUBLIC libStallLGTest libCudaUtilities)
