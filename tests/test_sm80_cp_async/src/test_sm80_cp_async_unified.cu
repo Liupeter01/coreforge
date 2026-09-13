@@ -1,10 +1,10 @@
 #include <algorithm>
-#include <cp_async_copy.cuh>
 #include <gpu.cuh>
-#include <gtest/gtest.h>
+
+using MyTestParam = std::tuple<size_t, size_t, size_t>;
 
 class Unified
-    : public ::testing::TestWithParam<std::tuple<size_t, size_t, size_t>> {};
+    : public ::testing::TestWithParam<MyTestParam> {};
 
 TEST_P(Unified, DifferentShapes) {
   check_device();
@@ -41,7 +41,7 @@ TEST_P(Unified, DifferentShapes) {
 
     check(cudaEventRecord(start));
 
-    gemm_unified_double_buffer<<<grid, block>>>(da.ptr, db.ptr, dc.ptr, m, n,
+    gemm_unified_double_buffer<16><<<grid, block>>>(da.ptr, db.ptr, dc.ptr, m, n,
                                                 k);
 
     check(cudaGetLastError());
@@ -77,10 +77,12 @@ TEST_P(Unified, DifferentShapes) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(SM80CPAsyncTest, Unified,
-                         ::testing::Values({0, 17, 16}, {17, 0, 16}, {1, 1, 0},
-                                           {17, 19, 0}, {1, 1, 1}, {15, 17, 1},
-                                           {16, 16, 16}, {17, 19, 17},
-                                           {31, 33, 31}, {33, 31, 32},
-                                           {17, 33, 33}, {31, 19, 47},
-                                           {33, 17, 48}, {37, 35, 65}));
+INSTANTIATE_TEST_SUITE_P(SM80AsyncTest, Unified,
+         :: testing::ValuesIn(std::vector<MyTestParam>{
+                    {0, 17, 16}, { 17, 0, 16 }, { 1, 1, 0 },
+                    { 17, 19, 0 }, { 1, 1, 1 }, { 15, 17, 1 },
+                    { 16, 16, 16 }, { 17, 19, 17 },
+                    { 31, 33, 31 }, { 33, 31, 32 },
+                    { 17, 33, 33 }, { 31, 19, 47 },
+                    { 33, 17, 48 }, { 37, 35, 65 }
+}));

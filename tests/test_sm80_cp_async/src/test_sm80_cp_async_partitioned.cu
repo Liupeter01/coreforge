@@ -1,18 +1,15 @@
 #include <algorithm>
-#include <cp_async_copy.cuh>
 #include <gpu.cuh>
-#include <gtest/gtest.h>
+
+using MyTestParam = ::std::tuple</*grid*/ std::size_t, /*length*/ std::size_t>;
 
 class Partitioned
-    : public ::testing::TestWithParam<
-          std::pair</*grid*/ std::size_t, /*length*/ std::size_t>> {};
+    : public ::testing::TestWithParam<MyTestParam> {};
 
 TEST_P(Partitioned, DifferentLengths) {
   check_device();
 
-  auto param = GetParam();
-  unsigned grid = param.first;
-  size_t length = param.second;
+  auto [grid, length] = GetParam();
 
   std::vector<float> in(length), out(length);
 
@@ -57,15 +54,17 @@ TEST_P(Partitioned, DifferentLengths) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    SM80CPAsyncTest, Partitioned,
-    ::testing::Values({1u, 0}, {1u, 1}, {1u, 63}, {1u, 64}, {1u, 127},
-                      {1u, 128}, {1u, 129}, {1u, 255}, {1u, 256}, {1u, 257},
-                      {1u, 4097}, {1u, 10003},
+          SM80AsyncTest, Partitioned,
+    ::testing::ValuesIn(std::vector<MyTestParam>{
+              {1, 0}, { 1, 1 }, { 1, 63 }, { 1, 64 }, { 1, 127 },
+              { 1, 128 }, { 1, 129 }, { 1, 255 }, { 1, 256 }, { 1, 257 },
+              { 1, 4097 }, { 1, 10003 },
 
-                      {3u, 0}, {3u, 1}, {3u, 63}, {3u, 64}, {3u, 127},
-                      {3u, 128}, {3u, 129}, {3u, 255}, {3u, 256}, {3u, 257},
-                      {3u, 4097}, {3u, 10003},
+              { 3, 0 }, { 3, 1 }, { 3, 63 }, { 3, 64 }, { 3, 127 },
+              { 3, 128 }, { 3, 129 }, { 3, 255 }, { 3, 256 }, { 3, 257 },
+              { 3, 4097 }, { 3, 10003 },
 
-                      {32u, 0}, {32u, 1}, {32u, 63}, {32u, 64}, {32u, 127},
-                      {32u, 128}, {32u, 129}, {32u, 255}, {32u, 256},
-                      {32u, 257}, {32u, 4097}, {32u, 10003}));
+              { 32, 0 }, { 32, 1 }, { 32, 63 }, { 32, 64 }, { 32, 127 },
+              { 32, 128 }, { 32, 129 }, { 32, 255 }, { 32, 256 },
+              { 32, 257 }, { 32, 4097 }, { 32, 10003 }
+}));
