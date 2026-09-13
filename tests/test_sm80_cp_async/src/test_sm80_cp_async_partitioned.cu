@@ -3,8 +3,7 @@
 
 using MyTestParam = ::std::tuple</*grid*/ std::size_t, /*length*/ std::size_t>;
 
-class Partitioned
-    : public ::testing::TestWithParam<MyTestParam> {};
+class Partitioned : public ::testing::TestWithParam<MyTestParam> {};
 
 TEST_P(Partitioned, DifferentLengths) {
   check_device();
@@ -54,17 +53,13 @@ TEST_P(Partitioned, DifferentLengths) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-          SM80AsyncTest, Partitioned,
+    SM80AsyncTest, Partitioned,
     ::testing::ValuesIn(std::vector<MyTestParam>{
-              {1, 0}, { 1, 1 }, { 1, 63 }, { 1, 64 }, { 1, 127 },
-              { 1, 128 }, { 1, 129 }, { 1, 255 }, { 1, 256 }, { 1, 257 },
-              { 1, 4097 }, { 1, 10003 },
+        {1, 0},    {1, 1},    {1, 63},   {1, 64},   {1, 127},   {1, 128},
+        {1, 129},  {1, 255},  {1, 256},  {1, 257},  {1, 4097},  {1, 10003},
 
-              { 3, 0 }, { 3, 1 }, { 3, 63 }, { 3, 64 }, { 3, 127 },
-              { 3, 128 }, { 3, 129 }, { 3, 255 }, { 3, 256 }, { 3, 257 },
-              { 3, 4097 }, { 3, 10003 },
+        {3, 0},    {3, 1},    {3, 63},   {3, 64},   {3, 127},   {3, 128},
+        {3, 129},  {3, 255},  {3, 256},  {3, 257},  {3, 4097},  {3, 10003},
 
-              { 32, 0 }, { 32, 1 }, { 32, 63 }, { 32, 64 }, { 32, 127 },
-              { 32, 128 }, { 32, 129 }, { 32, 255 }, { 32, 256 },
-              { 32, 257 }, { 32, 4097 }, { 32, 10003 }
-}));
+        {32, 0},   {32, 1},   {32, 63},  {32, 64},  {32, 127},  {32, 128},
+        {32, 129}, {32, 255}, {32, 256}, {32, 257}, {32, 4097}, {32, 10003}}));

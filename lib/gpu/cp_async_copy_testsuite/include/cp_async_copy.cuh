@@ -88,7 +88,7 @@ __global__ void gemm_unified_double_buffer(const float *A, const float *B,
     C[std::size_t(row) * N + col] = acc;
 }
 
-__global__ void scale_partitioned_double_buffer(const float* in, float* out,
-          std::size_t n);
+__global__ void scale_partitioned_double_buffer(const float *in, float *out,
+                                                std::size_t n);
 
 #endif // _CP_ASYNC_COPY_CUH_

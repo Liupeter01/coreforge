@@ -5,24 +5,23 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 inline void check(cudaError_t status) { ASSERT_EQ(status, cudaSuccess); }
 
 inline void check_device() {
-          try {
-                    int device = 0;
-                    check(cudaGetDevice(&device));
-                    cudaDeviceProp prop{};
-                    check(cudaGetDeviceProperties(&prop, device));
-                    if (prop.major < 8)
-                              throw std::runtime_error("This test targets SM80+ hardware");
+  try {
+    int device = 0;
+    check(cudaGetDevice(&device));
+    cudaDeviceProp prop{};
+    check(cudaGetDeviceProperties(&prop, device));
+    if (prop.major < 8)
+      throw std::runtime_error("This test targets SM80+ hardware");
 
-          }
-          catch (const std::exception& error) {
-                    std::fprintf(stderr, "FAIL: %s\n", error.what());
-          }
+  } catch (const std::exception &error) {
+    std::fprintf(stderr, "FAIL: %s\n", error.what());
+  }
 }
 
 // RAII
