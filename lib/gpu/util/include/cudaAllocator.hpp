@@ -5,6 +5,7 @@
 #include <numeric>
 #include <stdexcept>
 #include <type_traits>
+#include <cudaHelper.cuh>
 
 struct CudaMemStrategy {
   virtual cudaError_t malloc(void **ptr, std::size_t size) = 0;
@@ -65,11 +66,11 @@ template <typename _Ty, typename _Strategy> struct CudaAllocator {
     if (res == cudaErrorMemoryAllocation) {
       throw std::bad_alloc();
     }
-    // CHECK_CUDA(res);
+
     return static_cast<_Ty *>(ptr);
   }
   void deallocate(_Ty *ptr, std::size_t size = 0) {
-    // CHECK_CUDA(strat_.free(ptr));
+    checkCuda(strat_.free(ptr));
   }
   template <typename... Args> void construct(_Ty *p, Args &&...args) {
     if constexpr (!(sizeof...(args) == 0 && std::is_pod_v<_Ty>))
