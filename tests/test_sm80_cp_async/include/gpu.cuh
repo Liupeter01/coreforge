@@ -6,6 +6,24 @@
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
 #include <vector>
+#include <tuple>
+
+inline void check(cudaError_t status) { ASSERT_EQ(status, cudaSuccess); }
+
+inline void check_device() {
+          try {
+                    int device = 0;
+                    check(cudaGetDevice(&device));
+                    cudaDeviceProp prop{};
+                    check(cudaGetDeviceProperties(&prop, device));
+                    if (prop.major < 8)
+                              throw std::runtime_error("This test targets SM80+ hardware");
+
+          }
+          catch (const std::exception& error) {
+                    std::fprintf(stderr, "FAIL: %s\n", error.what());
+          }
+}
 
 // RAII
 struct DeviceBuffer {
@@ -21,21 +39,5 @@ struct DeviceBuffer {
       cudaFree(ptr);
   }
 };
-
-static inline void check(cudaError_t status) { ASSERT_EQ(status, cudaSuccess); }
-
-static inline void check_device() {
-  try {
-    int device = 0;
-    check(cudaGetDevice(&device));
-    cudaDeviceProp prop{};
-    check(cudaGetDeviceProperties(&prop, device));
-    if (prop.major < 8)
-      throw std::runtime_error("This test targets SM80+ hardware");
-
-  } catch (const std::exception &error) {
-    std::fprintf(stderr, "FAIL: %s\n", error.what());
-  }
-}
 
 #endif //_GPU_CUH_
