@@ -3,13 +3,13 @@
 #define _COMMON_H_
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
-#include <nvToolsExt.h>
+#include <nvtx3/nvToolsExt.h>
 
 #include <cstddef>
 #include <tuple>
 #include <vector>
-
-#include <cudaAllocator.cuh>
+#include <cuda_tut_stall_short.cuh>
+#include <cudaAllocator.hpp>
 
 using TransposeParam = std::tuple<int, int>;
 

@@ -4,7 +4,7 @@
 // Shared
 // ============================================================
 
-TEST_P(TestStallShortTestSuite, Shared) {
+TEST_P(TestStallShortTestSuite, Baseline) {
   const auto [nx, ny] = GetParam();
 
   const std::size_t size = static_cast<std::size_t>(nx) * ny;
