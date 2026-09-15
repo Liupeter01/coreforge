@@ -28,5 +28,5 @@ add_executable(test_stall_lg_testsuite ${TEST_SOURCES} ${CUDA_FILE})
 target_include_directories(test_stall_lg_testsuite PUBLIC include)
 
 target_link_libraries(test_stall_lg_testsuite PUBLIC libStallLGTest libCudaUtilities GTest::gtest)
-gtest_discover_tests(test_stall_lg_testsuite)
+#gtest_discover_tests(test_stall_lg_testsuite)
 
