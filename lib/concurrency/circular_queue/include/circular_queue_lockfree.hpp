@@ -54,60 +54,35 @@ template <typename _Ty> struct Cell {
 };
 } // namespace details
 
-// bool push(const _Ty& value) {
-//          std::size_t tail_value =
-//          m_tail.atomic_.load(std::memory_order_relaxed); do {
-//                    if (next(tail_value) ==
-//                    m_head.atomic_.load(std::memory_order_acquire))
-//                              return false;
-
-//          } while (!m_tail.atomic_.compare_exchange_weak(tail_value,
-//          next(tail_value),
-//                    std::memory_order_acq_rel,
-//                    std::memory_order_relaxed));
-
-//          m_data[tail_value] = value;
-
-//          std::size_t update_tail;
-//          do {
-//                    update_tail = tail_value;
-//          } while (!m_updated_tail.atomic_.compare_exchange_weak(
-//                    update_tail, next(update_tail),
-//                    std::memory_order_acq_rel,
-//                    std::memory_order_relaxed));
-
-//          return true;
-//}
-
-// bool pop(_Ty& value) {
-//           std::size_t head_value =
-//           m_head.atomic_.load(std::memory_order_relaxed);
-
-//          do {
-//                    if (head_value ==
-//                    m_tail.atomic_.load(std::memory_order_acquire))
-//                              return false;
-
-//                    if (head_value ==
-//                    m_updated_tail.atomic_.load(std::memory_order_acquire))
-//                              return false;
-
-//                    value = m_data[head_value];
-
-//          } while (!m_head.atomic_.compare_exchange_weak(head_value,
-//          next(head_value),
-//                    std::memory_order_acq_rel,
-//                    std::memory_order_relaxed));
-
-//          return true;
-//}
-
+// Why the previous implementation below is not safe:
+//
+// push() reserves a position by advancing m_tail before it writes the value.
+// m_updated_tail then forces producers to publish those writes in reservation
+// order. If a producer is suspended after advancing m_tail, every later
+// producer spins behind it, so the global publication frontier serializes the
+// producers and the algorithm does not provide lock-free progress.
+//
+// The more serious problem is in pop(): it copies m_data[head_value] before it
+// has successfully claimed head_value with compare_exchange_weak(). Multiple
+// consumers may therefore start reading the same non-atomic object. After one
+// consumer wins the CAS, a producer may observe the advanced head and reuse
+// that slot while a losing consumer is still copying from it. That creates an
+// unsynchronized read/write data race (and undefined behavior for a non-atomic
+// _Ty). A successful CAS only grants ownership of the head counter; it cannot
+// retroactively make the earlier data read safe.
+//
+// The current implementation fixes both problems with a sequence number per
+// cell: a consumer reads data only after claiming the cell, and the cell is not
+// made reusable until that read has completed.
+//
 template <typename _Ty, std::size_t _Size> class ConcurrentCircularQueue {
   ConcurrentCircularQueue(const ConcurrentCircularQueue &) = delete;
   ConcurrentCircularQueue &operator=(const ConcurrentCircularQueue &) = delete;
 
-  static_assert(_Size > 0 && _Size < std::numeric_limits<std::size_t>::max(),
-                "_Size must >0 and < std::size_t max");
+  // With one cell, the published and next-free generations overlap, so a
+  // second push can be accepted before the first value is consumed.
+  static_assert(_Size > 1 && _Size < std::numeric_limits<std::size_t>::max(),
+                "_Size must be greater than 1 and less than std::size_t max");
   static_assert((_Size & (_Size - 1)) == 0, "_Size must be power of two");
 
 public:
