@@ -3,7 +3,7 @@
 #include <thread>
 
 struct MyClass {
-          int a;
+  int a;
 };
 
 #define TEST_POP_TRUE                                                          \
@@ -19,24 +19,23 @@ struct MyClass {
   }
 
 TEST(ConcurrentCircularQueue, SingleThreadPushAndPop) {
-          concurrency::ConcurrentCircularQueue<MyClass, 4> queue;
+  concurrency::ConcurrentCircularQueue<MyClass, 4> queue;
 
-          MyClass a, b;
+  MyClass a, b;
 
-          EXPECT_TRUE(queue.push(a));           //push
-          TEST_POP_TRUE                                  //pop
+  EXPECT_TRUE(queue.push(a)); // push
+  TEST_POP_TRUE               // pop
 
-                    EXPECT_TRUE(queue.push(a));           //push x2
-          EXPECT_TRUE(queue.push(a));
+      EXPECT_TRUE(queue.push(a)); // push x2
+  EXPECT_TRUE(queue.push(a));
 
-          TEST_POP_TRUE                                   //popx1
+  TEST_POP_TRUE // popx1
 
-                    EXPECT_TRUE(queue.push(a));            //push x2
-          EXPECT_TRUE(queue.push(a));
+      EXPECT_TRUE(queue.push(a)); // push x2
+  EXPECT_TRUE(queue.push(a));
 
-          TEST_POP_TRUE                                    //popx3
-                    TEST_POP_TRUE
-                    TEST_POP_TRUE
+  TEST_POP_TRUE // popx3
+      TEST_POP_TRUE TEST_POP_TRUE
 
-                    TEST_POP_FALSE                                  //its empty!
+      TEST_POP_FALSE // its empty!
 }
