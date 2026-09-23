@@ -447,9 +447,10 @@ static void BM_AOSOA_all_properties(benchmark::State &bm) {
       const auto count = size < (n - i * size) ? size : (n - i * size);
 #pragma omp simd
       for (long long j = 0; j < count; ++j) {
-        arr[i].x[j] += precalcualted_sin_x[i];
-        arr[i].y[j] += precalcualted_sin_y[i];
-        arr[i].z[j] += precalcualted_sin_z[i];
+        const auto index = i * size + j;
+        arr[i].x[j] += precalcualted_sin_x[index];
+        arr[i].y[j] += precalcualted_sin_y[index];
+        arr[i].z[j] += precalcualted_sin_z[index];
       }
     }
     benchmark::ClobberMemory();
