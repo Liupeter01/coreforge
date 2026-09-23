@@ -10,6 +10,7 @@
 #include <random>
 #include <stdio.h>
 #include <stdlib.h>
+#include <type_traits>
 #include <vector>
 
 #ifndef LIBHPC_USE_OPENMP
@@ -92,6 +93,22 @@ void safe_aligned_free(void *ptr) {
     std::free(base);
   }
 #endif
+}
+
+static int one_bits() {
+  static_assert(sizeof(int) == sizeof(float));
+  const float value = 1.0f;
+  int bits;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return bits;
+}
+
+template <typename T> void stream_bits32(int *pointer, const T &item) {
+  static_assert(sizeof(T) == sizeof(int));
+  static_assert(std::is_trivially_copyable_v<T>); // <type_traits>
+  int bits;
+  std::memcpy(&bits, &item, sizeof(bits));
+  _mm_stream_si32(pointer, bits);
 }
 
 static void BM_fill_zero_serial(benchmark::State &bm) {
@@ -622,6 +639,139 @@ static void BM_rand_blk_4096_seq_base_aligned(benchmark::State &bm) {
   }
 }
 
+static void BM_read(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  const auto arr = make_order(n);
+
+  for (auto _ : bm) {
+    float ret = 0;
+#pragma omp parallel for reduction(+ : ret) schedule(static)
+    for (long long i = 0; i < n; ++i)
+      ret += arr[i];
+    benchmark::DoNotOptimize(ret);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_write(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = 1;
+    }
+    auto *data = arr.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_read_and_write(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  auto arr = make_order(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = arr[i] + 1;
+    }
+    auto *data = arr.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_write_zero(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = 0;
+    }
+    benchmark::DoNotOptimize(arr);
+  }
+}
+
+static void BM_write_one(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = 1;
+    }
+    benchmark::DoNotOptimize(arr);
+  }
+}
+
+static void BM_write_streamed(benchmark::State &bm) {
+
+  constexpr long long stream_n = 1 << 28;
+  std::vector<int> stream_arr(stream_n);
+
+  const int bits = one_bits();
+
+  for (auto _ : bm) {
+#pragma omp parallel
+    {
+#pragma omp for schedule(static) nowait
+      for (long long i = 0; i < stream_n; ++i)
+        _mm_stream_si32(&stream_arr[i], bits);
+      _mm_sfence();
+    }
+    auto *data = stream_arr.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_write_streamed_and_read(benchmark::State &bm) {
+  const int bits = one_bits();
+  constexpr long long stream_n = 1 << 28;
+  std::vector<int> stream_arr(stream_n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < stream_n; ++i) {
+      _mm_stream_si32(&stream_arr[i], bits);
+
+      _mm_mfence();
+      benchmark::DoNotOptimize(stream_arr[i]); // read again
+    }
+  }
+}
+
+static void BM_origin(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  int *m = new int[n];
+  benchmark::DoNotOptimize(m);
+  benchmark::ClobberMemory();
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; ++i)
+      m[i] = 1;
+    benchmark::ClobberMemory();
+  }
+  delete[] m;
+}
+
+static void BM_init(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  int *m = new int[n]{};
+  benchmark::DoNotOptimize(m);
+  benchmark::ClobberMemory();
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; ++i)
+      m[i] = 1;
+    benchmark::ClobberMemory();
+  }
+  delete[] m;
+}
+
 constexpr std::size_t m = 1 << 13;
 constexpr std::size_t n = 1 << 15;
 std::vector<float> arr(n);
@@ -633,107 +783,6 @@ constexpr std::size_t nx = 1 << 13;
 constexpr std::size_t ny = 1 << 13;
 hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
-
-static void BM_write(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      arr[i] = 1;
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_write_streamed(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      float value = 1;
-      _mm_stream_si32((int *)&arr[i], *(int *)&value);
-    }
-    _mm_sfence();
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_write_streamed_and_read(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      float value = 1;
-      _mm_stream_si32((int *)&arr[i], *(int *)&value);
-      _mm_sfence();
-      benchmark::DoNotOptimize(arr[i]); // read again
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_read_and_write(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      arr[i] = arr[i] + 1;
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_write_zero(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      arr[i] = 0;
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_write_one(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      arr[i] = 1;
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_origin(benchmark::State &bm) {
-  int *m = new int[n];
-  for (auto _ : bm) {
-    for (std::size_t i = 0; i < n; ++i) {
-      m[i] = 1;
-    }
-  }
-  delete[] m;
-}
-
-static void BM_init(benchmark::State &bm) {
-  int *m = new int[n]{};
-  for (auto _ : bm) {
-    for (std::size_t i = 0; i < n; ++i) {
-      m[i] = 1;
-    }
-  }
-  delete[] m;
-}
-
-static void BM_java_style(benchmark::State &bm) {
-  for (auto _ : bm) {
-    std::vector<std::vector<std::vector<float>>> dimension(
-        n, std::vector<std::vector<float>>(n, std::vector<float>(n)));
-    benchmark::DoNotOptimize(dimension);
-  }
-}
-
-static void BM_flat(benchmark::State &bm) {
-  std::vector<float> flat(n * n * n);
-  for (auto _ : bm) {
-    std::vector<float> flat(n * n * n);
-    benchmark::DoNotOptimize(flat);
-  }
-}
 
 static void BM_XY(benchmark::State &bm) {
   std::vector<float> matrix2d(nx * ny);
@@ -1998,14 +2047,16 @@ BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
 BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
 BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
 
-BENCHMARK(BM_read_and_write);
-BENCHMARK(BM_write);
-BENCHMARK(BM_write_streamed);
-BENCHMARK(BM_write_streamed_and_read);
-BENCHMARK(BM_write_zero);
-BENCHMARK(BM_write_one);
-// BENCHMARK(BM_java_style);
-// BENCHMARK(BM_flat);
+BENCHMARK(BM_read)->UseRealTime();
+BENCHMARK(BM_read_and_write)->UseRealTime();
+BENCHMARK(BM_write)->UseRealTime();
+BENCHMARK(BM_write_zero)->UseRealTime();
+BENCHMARK(BM_write_one)->UseRealTime();
+BENCHMARK(BM_write_streamed)->UseRealTime();
+BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
+
+BENCHMARK(BM_origin)->UseRealTime();
+BENCHMARK(BM_init)->UseRealTime();
 
 BENCHMARK(BM_x_blur);
 BENCHMARK(BM_x_blur_prefetch);
