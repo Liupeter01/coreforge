@@ -1,6 +1,6 @@
 #include <HPCHighDimensionFlatArray.hpp>
 #include <SparseDS.hpp>
-#include <algorithm >
+#include <algorithm>
 #include <benchmark/benchmark.h>
 #include <cmath>
 #include <cstdint>
