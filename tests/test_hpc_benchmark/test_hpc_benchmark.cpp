@@ -185,7 +185,7 @@ static void BM_AOSOA_partical(benchmark::State& bm) {
 #pragma omp parallel for schedule(static)
                     for (long long i = 0; i < block_count; ++i) {
                               const auto count = size < (n - i * size) ? size : (n - i * size);
-                              //#pragma omp simd
+#pragma omp simd
                               for (long long j = 0; j < count; ++j)
                                         arr[i].x[j] = arr[i].x[j] + arr[i].y[j];
                     }
@@ -298,7 +298,7 @@ static void BM_AOSOA_all_properties(benchmark::State& bm) {
 #pragma omp parallel for schedule(static)
                     for (long long i = 0; i < block_count; ++i) {
                               const auto count = size < (n - i * size) ? size : (n - i * size);
-                              //#pragma omp simd
+#pragma omp simd
                               for (long long j = 0; j < count; ++j) {
                                         arr[i].x[j] += precalcualted_sin_x[i];
                                         arr[i].y[j] += precalcualted_sin_y[i];

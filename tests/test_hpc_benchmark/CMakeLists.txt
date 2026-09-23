@@ -26,3 +26,9 @@ target_link_libraries(
   test_hpc_benchmark
   PUBLIC ${OpenCV_LIBRARIES} benchmark::benchmark libmorton hpc_array
          sparse_data_structure libhpc_openmp)
+
+if(MSVC)
+    target_compile_options(  test_hpc_benchmark PRIVATE
+        /openmp:experimental
+    )
+endif()
