@@ -120,55 +120,76 @@ static void BM_strided(benchmark::State &bm) {
 
 static void BM_AOS_partical(benchmark::State &bm) {
   struct AOS {
-    float x;
-    float y;
-    float z;
+    float x, y, z;
   };
 
-  std::vector<AOS> arr(n);
+  constexpr long long n = 1 << 28;
+  std::vector<AOS> arr(n, AOS{1.0f, 2.0f, 3.0f});
+
+  auto *data = arr.data();
+  benchmark::DoNotOptimize(data);
+
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      arr[i].x = arr[i].x * arr[i].y;
-    }
-    benchmark::DoNotOptimize(arr);
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      arr[i].x = arr[i].x + arr[i].y;
+    benchmark::ClobberMemory();
   }
 }
 
 static void BM_SOA_partical(benchmark::State &bm) {
-  std::vector<float> x(n);
-  std::vector<float> y(n);
-  std::vector<float> z(n);
 
+  constexpr long long n = 1 << 28;
+  std::vector<float> x(n, 1.0f);
+  std::vector<float> y(n, 2.0f);
+  std::vector<float> z(n, 3.0f);
+
+  auto *px = x.data();
+  auto *py = y.data();
+  auto *pz = z.data();
+
+  benchmark::DoNotOptimize(px);
+  benchmark::DoNotOptimize(py);
+  benchmark::DoNotOptimize(pz);
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      x[i] = x[i] * y[i];
-    }
-    benchmark::DoNotOptimize(x);
-    benchmark::DoNotOptimize(y);
-    benchmark::DoNotOptimize(z);
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      x[i] = x[i] + y[i];
+
+    benchmark::ClobberMemory();
   }
 }
 
 static void BM_AOSOA_partical(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  constexpr std::size_t size = 1024;
   struct AOSOA {
-    float x[1024];
-    float y[1024];
-    float z[1024];
+    float x[size];
+    float y[size];
+    float z[size];
   };
 
-  std::vector<AOSOA> arr(n / 1024);
+  const long long block_count = (n + size - 1) / size;
+  std::vector<AOSOA> arr(block_count);
+
+  for (auto &block : arr) {
+    std::fill_n(block.x, size, 1.0f);
+    std::fill_n(block.y, size, 2.0f);
+    std::fill_n(block.z, size, 3.0f);
+  }
+
+  auto *data = arr.data();
+  benchmark::DoNotOptimize(data);
 
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / 1024; ++i) {
-      // #pragma omp simd
-      for (int j = 0; j < 1024; ++j) {
-        arr[i].x[j] = arr[i].x[j] * arr[i].y[j];
-      }
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < block_count; ++i) {
+      const auto count = size < (n - i * size) ? size : (n - i * size);
+#pragma omp simd
+      for (long long j = 0; j < count; ++j)
+        arr[i].x[j] = arr[i].x[j] + arr[i].y[j];
     }
-    benchmark::DoNotOptimize(arr);
+    benchmark::ClobberMemory();
   }
 }
 
@@ -176,7 +197,9 @@ static void BM_AOS_all_properties(benchmark::State &bm) {
   struct AOS {
     float x, y, z;
   };
-  std::vector<AOS> arr(n);
+
+  constexpr long long n = 1 << 28;
+  std::vector<AOS> arr(n, AOS{1.0f, 2.0f, 3.0f});
 
   std::vector<float> precalcualted_sin_x(n);
   std::vector<float> precalcualted_sin_y(n);
@@ -188,21 +211,33 @@ static void BM_AOS_all_properties(benchmark::State &bm) {
     precalcualted_sin_z[i] = sin(i + 2);
   }
 
+  auto *data = arr.data();
+  benchmark::DoNotOptimize(data);
+
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
       arr[i].x += precalcualted_sin_x[i];
       arr[i].y += precalcualted_sin_y[i];
       arr[i].z += precalcualted_sin_z[i];
     }
-    benchmark::DoNotOptimize(arr);
+    benchmark::ClobberMemory();
   }
 }
 
 static void BM_SOA_all_properties(benchmark::State &bm) {
-  std::vector<float> x(n);
-  std::vector<float> y(n);
-  std::vector<float> z(n);
+
+  constexpr long long n = 1 << 28;
+  std::vector<float> x(n, 1.0f);
+  std::vector<float> y(n, 2.0f);
+  std::vector<float> z(n, 3.0f);
+
+  auto *px = x.data();
+  auto *py = y.data();
+  auto *pz = z.data();
+  benchmark::DoNotOptimize(px);
+  benchmark::DoNotOptimize(py);
+  benchmark::DoNotOptimize(pz);
 
   std::vector<float> precalcualted_sin_x(n);
   std::vector<float> precalcualted_sin_y(n);
@@ -215,25 +250,37 @@ static void BM_SOA_all_properties(benchmark::State &bm) {
   }
 
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i) {
       x[i] += precalcualted_sin_x[i];
       y[i] += precalcualted_sin_y[i];
       z[i] += precalcualted_sin_z[i];
     }
-    benchmark::DoNotOptimize(x);
-    benchmark::DoNotOptimize(y);
-    benchmark::DoNotOptimize(z);
+    benchmark::ClobberMemory();
   }
 }
 
 static void BM_AOSOA_all_properties(benchmark::State &bm) {
+
+  constexpr long long n = 1 << 28;
+  constexpr std::size_t size = 1024;
   struct AOSOA {
-    float x[1024];
-    float y[1024];
-    float z[1024];
+    float x[size];
+    float y[size];
+    float z[size];
   };
-  std::vector<AOSOA> arr(n / 1024);
+
+  const long long block_count = (n + size - 1) / size;
+  std::vector<AOSOA> arr(block_count);
+
+  auto *data = arr.data();
+  benchmark::DoNotOptimize(data);
+
+  for (auto &block : arr) {
+    std::fill_n(block.x, size, 1.0f);
+    std::fill_n(block.y, size, 2.0f);
+    std::fill_n(block.z, size, 3.0f);
+  }
 
   std::vector<float> precalcualted_sin_x(n);
   std::vector<float> precalcualted_sin_y(n);
@@ -246,16 +293,17 @@ static void BM_AOSOA_all_properties(benchmark::State &bm) {
   }
 
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / 1024; ++i) {
-      // #pragma omp simd
-      for (int j = 0; j < 1024; ++j) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < block_count; ++i) {
+      const auto count = size < (n - i * size) ? size : (n - i * size);
+#pragma omp simd
+      for (long long j = 0; j < count; ++j) {
         arr[i].x[j] += precalcualted_sin_x[i];
         arr[i].y[j] += precalcualted_sin_y[i];
         arr[i].z[j] += precalcualted_sin_z[i];
       }
     }
-    benchmark::DoNotOptimize(arr);
+    benchmark::ClobberMemory();
   }
 }
 
@@ -1684,11 +1732,12 @@ BENCHMARK(BM_fill)
     ->Arg(1024 * 1024 * 1024)
     ->UseRealTime();
 
-BENCHMARK(BM_AOS_partical);
-BENCHMARK(BM_SOA_partical);
-BENCHMARK(BM_AOSOA_partical);
-BENCHMARK(BM_AOS_all_properties);
-BENCHMARK(BM_SOA_all_properties);
+BENCHMARK(BM_AOS_partical)->UseRealTime();
+BENCHMARK(BM_SOA_partical)->UseRealTime();
+BENCHMARK(BM_AOSOA_partical)->UseRealTime();
+BENCHMARK(BM_AOS_all_properties)->UseRealTime();
+BENCHMARK(BM_SOA_all_properties)->UseRealTime();
+BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
 
 BENCHMARK(BM_ordered);
 BENCHMARK(BM_random_64B);
