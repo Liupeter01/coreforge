@@ -3,20 +3,21 @@ project(LIBHPC_test LANGUAGES CXX C)
 
 include(FetchContent)
 
+# Sanitizers are useful for correctness testing, but they invalidate benchmark
+# timings. Keep Release-family builds uninstrumented and enable them only for
+# the Debug configuration. Generator expressions also work with multi-config
+# generators such as Xcode and Visual Studio.
 if(UNIX AND NOT APPLE)
-  message(STATUS "Configuring for Linux")
-  add_compile_options(-fsanitize=address,leak)
-  add_link_options(-fsanitize=address,leak)
+  message(STATUS "Configuring tests for Linux (sanitizers enabled in Debug)")
+  add_compile_options($<$<CONFIG:Debug>:-fsanitize=address,leak>)
+  add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak>)
 elseif(APPLE)
-  message(STATUS "Configuring for macOS")
-  add_compile_options(-fsanitize=address)
-  add_link_options(-fsanitize=address)
-  # Optional: enable leak detection (partial support)
-  set(ENV{ASAN_OPTIONS} "detect_leaks=1")
+  message(STATUS "Configuring tests for macOS (AddressSanitizer enabled in Debug)")
+  add_compile_options($<$<CONFIG:Debug>:-fsanitize=address>)
+  add_link_options($<$<CONFIG:Debug>:-fsanitize=address>)
 elseif(WIN32)
-  message(WARNING "Sanitizers not yet configured for Windows")
-  # ASan for MSVC or clang-cl (more limited) You may skip or use CMake presets
-  # to control this
+  message(WARNING "Sanitizers not yet configured for Windows Debug builds")
+  # ASan for MSVC or clang-cl requires compiler-specific handling.
 endif()
 
 FetchContent_Declare(
