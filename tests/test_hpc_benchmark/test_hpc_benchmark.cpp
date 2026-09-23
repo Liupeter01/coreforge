@@ -91,6 +91,96 @@ static void BM_fill_zero_parallel_tbb(benchmark::State &bm) {
 }
 #endif
 
+static void BM_sin_serial(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; ++i)
+      arr[i] = static_cast<float>(std::sin(static_cast<double>(i)));
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_sin_parallel_omp(benchmark::State &bm) {
+  constexpr long long n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      arr[i] = static_cast<float>(std::sin(static_cast<double>(i)));
+    benchmark::ClobberMemory();
+  }
+}
+
+#if LIBHPC_USE_TBB
+static void BM_sin_parallel_tbb(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    tbb::parallel_for(tbb::blocked_range<std::size_t>(0, n),
+                      [&arr](const tbb::blocked_range<std::size_t> &ranges) {
+                        for (auto i = ranges.begin(); i != ranges.end(); ++i)
+                          arr[i] = static_cast<float>(
+                              std::sin(static_cast<double>(i)));
+                      });
+    benchmark::ClobberMemory();
+  }
+}
+#endif
+
+static void BM_serial_simple_inc(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 28;
+  std::vector<float> arr(n); // 1GiB
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; ++i)
+      arr[i] += 1;
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_serial_complex_inc(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n); // 1GiB
+
+  for (auto _ : bm) {
+    for (long long i = 0; i < n; ++i)
+      arr[i] =
+          static_cast<float>(arr[i] + 1.0 + std::sin(static_cast<double>(i)) +
+                             std::cos(static_cast<double>(i)));
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_parallel_simple_inc(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n); // 1GiB
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      arr[i] += 1;
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_parallel_complex_inc(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n); // 1GiB
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      arr[i] =
+          static_cast<float>(arr[i] + 1.0 + std::sin(static_cast<double>(i)) +
+                             std::cos(static_cast<double>(i)));
+    benchmark::ClobberMemory();
+  }
+}
+
 static void BM_fill(benchmark::State &bm) {
   const auto fill = static_cast<std::size_t>(bm.range(0));
 
@@ -1711,6 +1801,18 @@ BENCHMARK(BM_fill_zero_parallel_omp);
 #if LIBHPC_USE_TBB
 BENCHMARK(BM_fill_zero_parallel_tbb);
 #endif
+
+BENCHMARK(BM_sin_serial);
+BENCHMARK(BM_sin_parallel_omp);
+
+#if LIBHPC_USE_TBB
+BENCHMARK(BM_sin_parallel_tbb);
+#endif
+
+BENCHMARK(BM_serial_simple_inc);
+BENCHMARK(BM_serial_complex_inc);
+BENCHMARK(BM_parallel_simple_inc);
+BENCHMARK(BM_parallel_complex_inc);
 
 BENCHMARK(BM_strided)
     ->Arg(1)
