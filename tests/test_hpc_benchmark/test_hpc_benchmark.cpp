@@ -1,9 +1,16 @@
 #include <HPCHighDimensionFlatArray.hpp>
 #include <SparseDS.hpp>
+#include <algorithm>
 #include <benchmark/benchmark.h>
 #include <cmath>
+#include <cstdint>
 #include <libmorton/morton.h>
 #include <mutex>
+#include <numeric>
+#include <random>
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
 
 #ifndef LIBHPC_USE_OPENMP
 #define LIBHPC_USE_OPENMP 0
@@ -40,17 +47,52 @@ inline void omp_set_num_threads(int) noexcept {}
 // #include <x86/svml.h>
 #endif
 
-constexpr std::size_t m = 1 << 13;
-constexpr std::size_t n = 1 << 15;
-std::vector<float> arr(n);
+/*Generate Random*/
+[[nodiscard]]
+static inline std::vector<std::uint32_t> make_order(std::size_t count) {
+  std::vector<std::uint32_t> order(count);
+  std::iota(order.begin(), order.end(), std::uint32_t{0});
+  std::mt19937 rng(42);
+  std::shuffle(order.begin(), order.end(), rng);
+  return order;
+}
 
-#define N (1024 * 1024)
+void *safe_aligned_alloc(size_t alignment, size_t size) {
+#if defined(_MSC_VER)
+  return _aligned_malloc(size, alignment);
+#elif defined(__APPLE__) || defined(__linux__)
+  // macOS posix_memalign£»Linux aligned_alloc
+  void *ptr = nullptr;
+  return posix_memalign(&ptr, alignment, size) == 0 ? ptr : nullptr;
+#else
+  // fallback: malloc + manual alignment
+  const size_t overhead = alignment + sizeof(void *);
+  char *base = static_cast<char *>(std::malloc(overhead + size));
+  if (!base)
+    return nullptr;
+  char *aligned =
+      base + sizeof(void *) +
+      (alignment -
+       (reinterpret_cast<uintptr_t>(base + sizeof(void *)) % alignment)) %
+          alignment;
+  *reinterpret_cast<void **>(aligned - sizeof(void *)) = base;
+  return aligned;
+#endif
+}
 
-constexpr int nblur = 8;
-constexpr std::size_t nx = 1 << 13;
-constexpr std::size_t ny = 1 << 13;
-hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
-hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
+void safe_aligned_free(void *ptr) {
+#if defined(_MSC_VER)
+  _aligned_free(ptr);
+#elif defined(__APPLE__) || defined(__linux__)
+  std::free(ptr); // posix_memalign
+#else
+  if (ptr) {
+    void *base =
+        *reinterpret_cast<void **>(static_cast<char *>(ptr) - sizeof(void *));
+    std::free(base);
+  }
+#endif
+}
 
 static void BM_fill_zero_serial(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 27;
@@ -398,92 +440,199 @@ static void BM_AOSOA_all_properties(benchmark::State &bm) {
 }
 
 static void BM_ordered(benchmark::State &bm) {
+  constexpr long long n = 1 << 28; // 512MiB
+  std::vector<float> arr(n, 0.f);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
       benchmark::DoNotOptimize(arr[i]);
-    }
-    benchmark::DoNotOptimize(arr);
   }
 }
 
 static void BM_random(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n, 0.f);
 
-  std::vector<float> indicies(n);
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
-  for (int i = 0; i < n; ++i) {
-    indicies[i] = rand() % n;
-  }
+  const auto order = make_order(n);
 
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-      benchmark::DoNotOptimize(arr[indicies[i]]);
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
-
-static void BM_random_64B(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / 16; ++i) {
-      auto r = rand() % (n / 16);
-      for (int j = 0; j < 16; ++j) {
-        benchmark::DoNotOptimize(arr[16 * r + j]);
-      }
-    }
-    benchmark::DoNotOptimize(arr);
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      benchmark::DoNotOptimize(arr[order[i]]);
   }
 }
 
-static void BM_random_64B_prefetch(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / 16; ++i) {
-      auto r = rand() % (n / 16);
-      _mm_prefetch(reinterpret_cast<const char *>(&arr[16 * (r + 1)]),
-                   _MM_HINT_T0);
-      for (std::size_t j = 0; j < 16; ++j) {
-        benchmark::DoNotOptimize(arr[16 * r + j]);
-      }
-    }
-    benchmark::DoNotOptimize(arr);
-  }
-}
+static void BM_rand_blk_64_seq_base_not_aligned(benchmark::State &bm) {
 
-constexpr uint64_t block = 4096;
-static void BM_random_4096B(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  constexpr long long block = 64 / sizeof(float); // float x16
+
+  std::vector<float> arr(n, 0.f);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
+  const auto order = make_order(n / block);
+
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / block; ++i) {
-      auto r = rand() % (n / block);
-      // #pragma omp simd
-      for (int j = 0; j < block; ++j)
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n / block; ++i) {
+      const std::size_t r = order[i];
+
+      // At the beginning of the block: it might miss
+      //  In the Block: reuse cacheline
+      for (long long j = 0; j < block; ++j)
         benchmark::DoNotOptimize(arr[block * r + j]);
-
-      benchmark::DoNotOptimize(arr);
     }
   }
 }
 
-static void BM_random_4KB_align(benchmark::State &bm) {
-  float *a = (float *)_mm_malloc(n * sizeof(float), block);
-  memset(a, 0, n * sizeof(float));
+static void BM_rand_blk_64_seq_base_aligned(benchmark::State &bm) {
+
+  constexpr long long n = 1 << 28; // 512MiB
+
+  constexpr long long block = 64 / sizeof(float); //  16 float
+  const auto order = make_order(n / block);
+
+  float *ptr = static_cast<float *>(safe_aligned_alloc(64, sizeof(float) * n));
+  if (!ptr) {
+    bm.SkipWithError("allocation failed");
+    return;
+  }
+  std::fill_n(ptr, n, 0.0f);
+  benchmark::DoNotOptimize(ptr);
+  benchmark::ClobberMemory();
+
+  std::shared_ptr<float> arr(ptr, [](auto *t) {
+    if (t)
+      safe_aligned_free(t);
+  });
 
   for (auto _ : bm) {
-#pragma omp parallel for
-    for (int i = 0; i < n / block; ++i) {
-      auto r = rand() % (n / block);
-      // #pragma omp simd
-      for (int j = 0; j < block; ++j)
-        benchmark::DoNotOptimize(a[block * r + j]);
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n / block; ++i) {
+      const std::size_t r = order[i];
 
-      benchmark::DoNotOptimize(arr);
+      for (long long j = 0; j < block; ++j)
+        benchmark::DoNotOptimize(arr.get()[block * r + j]);
     }
   }
-  _mm_free(a);
 }
+
+static void BM_rand_blk_64_seq_base_aligned_prefetch(benchmark::State &bm) {
+
+  constexpr long long n = 1 << 28; // 512MiB
+
+  constexpr long long block = 64 / sizeof(float); //  16 float
+  const auto order = make_order(n / block);
+
+  float *ptr = static_cast<float *>(safe_aligned_alloc(64, sizeof(float) * n));
+  if (!ptr) {
+    bm.SkipWithError("allocation failed");
+    return;
+  }
+  std::fill_n(ptr, n, 0.0f);
+  benchmark::DoNotOptimize(ptr);
+  benchmark::ClobberMemory();
+
+  std::shared_ptr<float> arr(ptr, [](auto *t) {
+    if (t)
+      safe_aligned_free(t);
+  });
+
+  _mm_prefetch(reinterpret_cast<const char *>(&arr.get()[order[0]]),
+               _MM_HINT_T0);
+
+  for (auto _ : bm) {
+
+#pragma omp parallel for schedule(static)
+    for (long long i = 1; i < n / block; ++i) {
+      const std::size_t r = order[i - 1];
+      _mm_prefetch(reinterpret_cast<const char *>(&arr.get()[block * order[i]]),
+                   _MM_HINT_T0);
+      for (long long j = 0; j < block; ++j)
+        benchmark::DoNotOptimize(arr.get()[block * r + j]);
+    }
+
+    const std::size_t r = order[(n / block) - 1];
+    for (long long j = 0; j < block; ++j)
+      benchmark::DoNotOptimize(arr.get()[block * r + j]);
+  }
+}
+
+static void BM_rand_blk_4096_seq_base_not_aligned(benchmark::State &bm) {
+  constexpr long long block_bytes = 4096;
+  constexpr long long block = block_bytes / sizeof(float); // 1024¸öfloat
+
+  constexpr long long n = 1 << 28; // 512MiB
+  std::vector<float> arr(n, 0.f);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
+  const auto order = make_order(n / block);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n / block; ++i) {
+      const std::size_t r = order[i];
+
+      for (long long j = 0; j < block; ++j)
+        benchmark::DoNotOptimize(arr[block * r + j]);
+    }
+  }
+}
+
+static void BM_rand_blk_4096_seq_base_aligned(benchmark::State &bm) {
+
+  constexpr long long n = 1 << 28; // 512MiB
+  constexpr long long block_bytes = 4096;
+  constexpr long long block = block_bytes / sizeof(float); // 1024¸öfloat
+
+  const auto order = make_order(n / block);
+
+  float *ptr = static_cast<float *>(safe_aligned_alloc(64, sizeof(float) * n));
+  if (!ptr) {
+    bm.SkipWithError("allocation failed");
+    return;
+  }
+  std::fill_n(ptr, n, 0.0f);
+  benchmark::DoNotOptimize(ptr);
+  benchmark::ClobberMemory();
+
+  std::shared_ptr<float> arr(ptr, [](auto *t) {
+    if (t)
+      safe_aligned_free(t);
+  });
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n / block; ++i) {
+      const std::size_t r = order[i];
+      for (long long j = 0; j < block; ++j)
+        benchmark::DoNotOptimize(arr.get()[block * r + j]);
+    }
+  }
+}
+
+constexpr std::size_t m = 1 << 13;
+constexpr std::size_t n = 1 << 15;
+std::vector<float> arr(n);
+
+#define N (1024 * 1024)
+
+constexpr int nblur = 8;
+constexpr std::size_t nx = 1 << 13;
+constexpr std::size_t ny = 1 << 13;
+hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
+hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
 static void BM_write(benchmark::State &bm) {
   for (auto _ : bm) {
@@ -1841,12 +1990,13 @@ BENCHMARK(BM_AOS_all_properties)->UseRealTime();
 BENCHMARK(BM_SOA_all_properties)->UseRealTime();
 BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
 
-BENCHMARK(BM_ordered);
-BENCHMARK(BM_random_64B);
-BENCHMARK(BM_random_4096B);
-BENCHMARK(BM_random_4KB_align);
-BENCHMARK(BM_random_64B);
-BENCHMARK(BM_random_64B_prefetch);
+BENCHMARK(BM_ordered)->UseRealTime();
+BENCHMARK(BM_random)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
 
 BENCHMARK(BM_read_and_write);
 BENCHMARK(BM_write);
