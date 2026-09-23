@@ -75,6 +75,7 @@ static void BM_fill_zero_parallel_omp(benchmark::State& bm) {
           }
 }
 
+#if LIBHPC_USE_TBB
 static void BM_fill_zero_parallel_tbb(benchmark::State& bm) {
           constexpr long long n = 1 << 27;
           std::vector<float> arr(n);
@@ -87,6 +88,7 @@ static void BM_fill_zero_parallel_tbb(benchmark::State& bm) {
                     benchmark::ClobberMemory();	//DoNotOptimize
           }
 }
+#endif
 
 static void BM_fill(benchmark::State& bm) {
           const auto fill = static_cast<std::size_t>(bm.range(0));
@@ -1658,7 +1660,10 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
 
 BENCHMARK(BM_fill_zero_serial);
 BENCHMARK(BM_fill_zero_parallel_omp);
+
+#if LIBHPC_USE_TBB
 BENCHMARK(BM_fill_zero_parallel_tbb);
+#endif
 
 BENCHMARK(BM_strided)
 ->Arg(1)->Arg(2)->Arg(4)->Arg(8)
