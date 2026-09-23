@@ -52,6 +52,72 @@ constexpr std::size_t ny = 1 << 13;
 hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
+static void BM_fill_zero_serial(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; ++i)
+      arr[i] = 0;
+    benchmark::ClobberMemory(); // DoNotOptimize
+  }
+}
+
+static void BM_fill_zero_parallel_omp(benchmark::State &bm) {
+  constexpr long long n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < n; ++i)
+      arr[i] = 0;
+    benchmark::ClobberMemory(); // DoNotOptimize
+  }
+}
+
+#if LIBHPC_USE_TBB
+static void BM_fill_zero_parallel_tbb(benchmark::State &bm) {
+  constexpr long long n = 1 << 27;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    tbb::parallel_for(tbb::blocked_range<std::size_t>(0, n),
+                      [&arr](const tbb::blocked_range<std::size_t> &ranges) {
+                        for (auto i = ranges.begin(); i != ranges.end(); ++i)
+                          arr[i] = 0;
+                      });
+    benchmark::ClobberMemory(); // DoNotOptimize
+  }
+}
+#endif
+
+static void BM_fill(benchmark::State &bm) {
+  const auto fill = static_cast<std::size_t>(bm.range(0));
+
+  std::vector<float> arr(fill);
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < fill; ++i)
+      arr[i] = 0;
+    benchmark::ClobberMemory(); // DoNotOptimize
+  }
+  bm.SetItemsProcessed(bm.iterations() * static_cast<std::int64_t>((fill)));
+}
+
+static void BM_strided(benchmark::State &bm) {
+  const auto stride = static_cast<std::size_t>(bm.range(0));
+  constexpr std::size_t n = 1ULL << 30;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n; i += stride)
+      arr[i] = 1.0f;
+    benchmark::ClobberMemory();
+  }
+  bm.SetItemsProcessed(bm.iterations() *
+                       static_cast<std::int64_t>((n + stride - 1) / stride));
+}
+
 static void BM_AOS_partical(benchmark::State &bm) {
   struct AOS {
     float x;
@@ -1591,6 +1657,33 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
+BENCHMARK(BM_fill_zero_serial);
+BENCHMARK(BM_fill_zero_parallel_omp);
+
+#if LIBHPC_USE_TBB
+BENCHMARK(BM_fill_zero_parallel_tbb);
+#endif
+
+BENCHMARK(BM_strided)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->UseRealTime();
+
+BENCHMARK(BM_fill)
+    ->Arg(16 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024)
+    ->Arg(16 * 1024 * 1024)
+    ->Arg(128 * 1024 * 1024)
+    ->Arg(1024 * 1024 * 1024)
+    ->UseRealTime();
+
 BENCHMARK(BM_AOS_partical);
 BENCHMARK(BM_SOA_partical);
 BENCHMARK(BM_AOSOA_partical);
@@ -1645,7 +1738,7 @@ BENCHMARK(BM_matrix_mul_blocked);
 
 BENCHMARK(BM_conv);
 BENCHMARK(BM_conv_block);
-//BENCHMARK(BM_conv_block_unroll);
+// BENCHMARK(BM_conv_block_unroll);
 
 BENCHMARK(BM_false_sharing);
 BENCHMARK(BM_no_false_sharing);
