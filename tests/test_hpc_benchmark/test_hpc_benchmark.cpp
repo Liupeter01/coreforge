@@ -600,7 +600,7 @@ static void BM_rand_blk_64_seq_base_aligned_prefetch(benchmark::State &bm) {
       safe_aligned_free(t);
   });
 
-  _mm_prefetch(reinterpret_cast<const char *>(&arr.get()[order[0]]),
+  _mm_prefetch(reinterpret_cast<const char *>(&arr.get()[block * order[0]]),
                _MM_HINT_T0);
 
   for (auto _ : bm) {
