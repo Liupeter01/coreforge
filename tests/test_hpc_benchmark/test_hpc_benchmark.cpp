@@ -115,6 +115,9 @@ static void BM_fill_zero_serial(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 27;
   std::vector<float> arr(n);
 
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
   for (auto _ : bm) {
     for (std::size_t i = 0; i < n; ++i)
       arr[i] = 0;
@@ -125,6 +128,9 @@ static void BM_fill_zero_serial(benchmark::State &bm) {
 static void BM_fill_zero_parallel_omp(benchmark::State &bm) {
   constexpr long long n = 1 << 27;
   std::vector<float> arr(n);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
 #pragma omp parallel for schedule(static)
@@ -138,6 +144,9 @@ static void BM_fill_zero_parallel_omp(benchmark::State &bm) {
 static void BM_fill_zero_parallel_tbb(benchmark::State &bm) {
   constexpr long long n = 1 << 27;
   std::vector<float> arr(n);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
     tbb::parallel_for(tbb::blocked_range<std::size_t>(0, n),
@@ -154,6 +163,9 @@ static void BM_sin_serial(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 27;
   std::vector<float> arr(n);
 
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
   for (auto _ : bm) {
     for (std::size_t i = 0; i < n; ++i)
       arr[i] = static_cast<float>(std::sin(static_cast<double>(i)));
@@ -164,6 +176,9 @@ static void BM_sin_serial(benchmark::State &bm) {
 static void BM_sin_parallel_omp(benchmark::State &bm) {
   constexpr long long n = 1 << 27;
   std::vector<float> arr(n);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
 #pragma omp parallel for schedule(static)
@@ -177,6 +192,9 @@ static void BM_sin_parallel_omp(benchmark::State &bm) {
 static void BM_sin_parallel_tbb(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 27;
   std::vector<float> arr(n);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
     tbb::parallel_for(tbb::blocked_range<std::size_t>(0, n),
@@ -194,6 +212,9 @@ static void BM_serial_simple_inc(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 28;
   std::vector<float> arr(n); // 1GiB
 
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
   for (auto _ : bm) {
     for (std::size_t i = 0; i < n; ++i)
       arr[i] += 1;
@@ -204,6 +225,9 @@ static void BM_serial_simple_inc(benchmark::State &bm) {
 static void BM_serial_complex_inc(benchmark::State &bm) {
   constexpr long long n = 1 << 28;
   std::vector<float> arr(n); // 1GiB
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
     for (long long i = 0; i < n; ++i)
@@ -218,6 +242,9 @@ static void BM_parallel_simple_inc(benchmark::State &bm) {
   constexpr long long n = 1 << 28;
   std::vector<float> arr(n); // 1GiB
 
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
+
   for (auto _ : bm) {
 #pragma omp parallel for schedule(static)
     for (long long i = 0; i < n; ++i)
@@ -229,6 +256,9 @@ static void BM_parallel_simple_inc(benchmark::State &bm) {
 static void BM_parallel_complex_inc(benchmark::State &bm) {
   constexpr long long n = 1 << 28;
   std::vector<float> arr(n); // 1GiB
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
 #pragma omp parallel for schedule(static)
@@ -242,8 +272,10 @@ static void BM_parallel_complex_inc(benchmark::State &bm) {
 
 static void BM_fill(benchmark::State &bm) {
   const auto fill = static_cast<std::size_t>(bm.range(0));
-
   std::vector<float> arr(fill);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
     for (std::size_t i = 0; i < fill; ++i)
@@ -257,6 +289,9 @@ static void BM_strided(benchmark::State &bm) {
   const auto stride = static_cast<std::size_t>(bm.range(0));
   constexpr std::size_t n = 1ULL << 30;
   std::vector<float> arr(n);
+
+  float *ptr = arr.data();
+  benchmark::DoNotOptimize(ptr);
 
   for (auto _ : bm) {
     for (std::size_t i = 0; i < n; i += stride)
