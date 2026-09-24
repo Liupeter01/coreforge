@@ -2160,81 +2160,81 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
-//BENCHMARK(BM_fill_zero_serial);
-//BENCHMARK(BM_fill_zero_parallel_omp);
-//
-//#if LIBHPC_USE_TBB
-//BENCHMARK(BM_fill_zero_parallel_tbb);
-//#endif
-//
-//BENCHMARK(BM_sin_serial);
-//BENCHMARK(BM_sin_parallel_omp);
-//
-//#if LIBHPC_USE_TBB
-//BENCHMARK(BM_sin_parallel_tbb);
-//#endif
-//
-//BENCHMARK(BM_serial_simple_inc);
-//BENCHMARK(BM_serial_complex_inc);
-//BENCHMARK(BM_parallel_simple_inc);
-//BENCHMARK(BM_parallel_complex_inc);
-//
-//BENCHMARK(BM_strided)
-//    ->Arg(1)
-//    ->Arg(2)
-//    ->Arg(4)
-//    ->Arg(8)
-//    ->Arg(16)
-//    ->Arg(32)
-//    ->Arg(64)
-//    ->Arg(128)
-//    ->UseRealTime();
-//
-//BENCHMARK(BM_fill)
-//    ->Arg(16 * 1024)
-//    ->Arg(128 * 1024)
-//    ->Arg(1024 * 1024)
-//    ->Arg(16 * 1024 * 1024)
-//    ->Arg(128 * 1024 * 1024)
-//    ->Arg(1024 * 1024 * 1024)
-//    ->UseRealTime();
-//
-//BENCHMARK(BM_AOS_partical)->UseRealTime();
-//BENCHMARK(BM_SOA_partical)->UseRealTime();
-//BENCHMARK(BM_AOSOA_partical)->UseRealTime();
-//BENCHMARK(BM_AOS_all_properties)->UseRealTime();
-//BENCHMARK(BM_SOA_all_properties)->UseRealTime();
-//BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
-//
-//BENCHMARK(BM_ordered)->UseRealTime();
-//BENCHMARK(BM_random)->UseRealTime();
-//BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
-//BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
-//BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
-//BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
-//BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
-//
-//BENCHMARK(BM_read)->UseRealTime();
-//BENCHMARK(BM_read_and_write)->UseRealTime();
-//BENCHMARK(BM_write)->UseRealTime();
-//BENCHMARK(BM_write_zero)->UseRealTime();
-//BENCHMARK(BM_write_one)->UseRealTime();
-//BENCHMARK(BM_write_streamed)->UseRealTime();
-//BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
-//
-//BENCHMARK(BM_origin)->UseRealTime();
-//BENCHMARK(BM_init)->UseRealTime();
-//
-//BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
-//BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
-//BENCHMARK(BM_java_style_random)->UseRealTime();
-//BENCHMARK(BM_flat_random)->UseRealTime();
-//
-//BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
-//BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
-//
-//BENCHMARK(BM_XY)->UseRealTime();
-//BENCHMARK(BM_YX)->UseRealTime();
+BENCHMARK(BM_fill_zero_serial);
+BENCHMARK(BM_fill_zero_parallel_omp);
+
+#if LIBHPC_USE_TBB
+BENCHMARK(BM_fill_zero_parallel_tbb);
+#endif
+
+BENCHMARK(BM_sin_serial);
+BENCHMARK(BM_sin_parallel_omp);
+
+#if LIBHPC_USE_TBB
+BENCHMARK(BM_sin_parallel_tbb);
+#endif
+
+BENCHMARK(BM_serial_simple_inc);
+BENCHMARK(BM_serial_complex_inc);
+BENCHMARK(BM_parallel_simple_inc);
+BENCHMARK(BM_parallel_complex_inc);
+
+BENCHMARK(BM_strided)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->UseRealTime();
+
+BENCHMARK(BM_fill)
+    ->Arg(16 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024)
+    ->Arg(16 * 1024 * 1024)
+    ->Arg(128 * 1024 * 1024)
+    ->Arg(1024 * 1024 * 1024)
+    ->UseRealTime();
+
+BENCHMARK(BM_AOS_partical)->UseRealTime();
+BENCHMARK(BM_SOA_partical)->UseRealTime();
+BENCHMARK(BM_AOSOA_partical)->UseRealTime();
+BENCHMARK(BM_AOS_all_properties)->UseRealTime();
+BENCHMARK(BM_SOA_all_properties)->UseRealTime();
+BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
+
+BENCHMARK(BM_ordered)->UseRealTime();
+BENCHMARK(BM_random)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
+
+BENCHMARK(BM_read)->UseRealTime();
+BENCHMARK(BM_read_and_write)->UseRealTime();
+BENCHMARK(BM_write)->UseRealTime();
+BENCHMARK(BM_write_zero)->UseRealTime();
+BENCHMARK(BM_write_one)->UseRealTime();
+BENCHMARK(BM_write_streamed)->UseRealTime();
+BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
+
+BENCHMARK(BM_origin)->UseRealTime();
+BENCHMARK(BM_init)->UseRealTime();
+
+BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
+BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
+BENCHMARK(BM_java_style_random)->UseRealTime();
+BENCHMARK(BM_flat_random)->UseRealTime();
+
+BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
+BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
+
+BENCHMARK(BM_XY)->UseRealTime();
+BENCHMARK(BM_YX)->UseRealTime();
 
 BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
 BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
