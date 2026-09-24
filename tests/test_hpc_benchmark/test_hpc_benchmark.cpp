@@ -916,18 +916,6 @@ static void BM_avoid_false_sharing_issue(benchmark::State &bm) {
   }
 }
 
-constexpr std::size_t m = 1 << 13;
-constexpr std::size_t n = 1 << 15;
-std::vector<float> arr(n);
-
-#define N (1024 * 1024)
-
-constexpr int nblur = 8;
-constexpr std::size_t nx = 1 << 13;
-constexpr std::size_t ny = 1 << 13;
-hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
-hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
-
 static void BM_XY(benchmark::State &bm) {
   constexpr long long nx = 1 << 14;
   constexpr long long ny = 1 << 11;
@@ -963,6 +951,61 @@ static void BM_YX(benchmark::State &bm) {
     benchmark::ClobberMemory();
   }
 }
+
+static void BM_loop_fusion_seperate(benchmark::State& bm) {
+          constexpr long long n = 1 << 28;
+          std::vector<float> arr(n);
+
+          for (auto _ : bm) {
+                    bm.PauseTiming();
+                    std::fill(arr.begin(), arr.end(), 1.f);
+                    bm.ResumeTiming();
+
+                    /*the first loop*/
+#pragma omp parallel for
+                    for (long long i = 0; i < n; ++i)
+                              arr[i] = arr[i] * 2.f;
+
+                    /*the second loop, the pervious cache needs to be reloaded*/
+#pragma omp parallel for
+                    for (long long i = 0; i < n; ++i)
+                              arr[i] = arr[i] + 1.0f;
+
+                    benchmark::DoNotOptimize(arr.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
+static void BM_loop_fusion_merged(benchmark::State& bm) {
+          constexpr long long n = 1 << 28;
+          std::vector<float> arr(n);
+
+          for (auto _ : bm) {
+                    bm.PauseTiming();
+                    std::fill(arr.begin(), arr.end(), 1.f);
+                    bm.ResumeTiming();
+
+#pragma omp parallel for
+                    for (long long i = 0; i < n; ++i) {
+                              arr[i] = arr[i] * 2.f;   //the temp value may stay inside regs
+                              arr[i] = arr[i] + 1.0f;
+                    }
+                    benchmark::DoNotOptimize(arr.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
+constexpr std::size_t m = 1 << 13;
+constexpr std::size_t n = 1 << 15;
+std::vector<float> arr(n);
+
+#define N (1024 * 1024)
+
+constexpr int nblur = 8;
+constexpr std::size_t nx = 1 << 13;
+constexpr std::size_t ny = 1 << 13;
+hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
+hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
 static void BM_x_blur(benchmark::State &bm) {
   for (auto _ : bm) {
@@ -2117,81 +2160,84 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
-BENCHMARK(BM_fill_zero_serial);
-BENCHMARK(BM_fill_zero_parallel_omp);
+//BENCHMARK(BM_fill_zero_serial);
+//BENCHMARK(BM_fill_zero_parallel_omp);
+//
+//#if LIBHPC_USE_TBB
+//BENCHMARK(BM_fill_zero_parallel_tbb);
+//#endif
+//
+//BENCHMARK(BM_sin_serial);
+//BENCHMARK(BM_sin_parallel_omp);
+//
+//#if LIBHPC_USE_TBB
+//BENCHMARK(BM_sin_parallel_tbb);
+//#endif
+//
+//BENCHMARK(BM_serial_simple_inc);
+//BENCHMARK(BM_serial_complex_inc);
+//BENCHMARK(BM_parallel_simple_inc);
+//BENCHMARK(BM_parallel_complex_inc);
+//
+//BENCHMARK(BM_strided)
+//    ->Arg(1)
+//    ->Arg(2)
+//    ->Arg(4)
+//    ->Arg(8)
+//    ->Arg(16)
+//    ->Arg(32)
+//    ->Arg(64)
+//    ->Arg(128)
+//    ->UseRealTime();
+//
+//BENCHMARK(BM_fill)
+//    ->Arg(16 * 1024)
+//    ->Arg(128 * 1024)
+//    ->Arg(1024 * 1024)
+//    ->Arg(16 * 1024 * 1024)
+//    ->Arg(128 * 1024 * 1024)
+//    ->Arg(1024 * 1024 * 1024)
+//    ->UseRealTime();
+//
+//BENCHMARK(BM_AOS_partical)->UseRealTime();
+//BENCHMARK(BM_SOA_partical)->UseRealTime();
+//BENCHMARK(BM_AOSOA_partical)->UseRealTime();
+//BENCHMARK(BM_AOS_all_properties)->UseRealTime();
+//BENCHMARK(BM_SOA_all_properties)->UseRealTime();
+//BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
+//
+//BENCHMARK(BM_ordered)->UseRealTime();
+//BENCHMARK(BM_random)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
+//BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
+//
+//BENCHMARK(BM_read)->UseRealTime();
+//BENCHMARK(BM_read_and_write)->UseRealTime();
+//BENCHMARK(BM_write)->UseRealTime();
+//BENCHMARK(BM_write_zero)->UseRealTime();
+//BENCHMARK(BM_write_one)->UseRealTime();
+//BENCHMARK(BM_write_streamed)->UseRealTime();
+//BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
+//
+//BENCHMARK(BM_origin)->UseRealTime();
+//BENCHMARK(BM_init)->UseRealTime();
+//
+//BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
+//BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
+//BENCHMARK(BM_java_style_random)->UseRealTime();
+//BENCHMARK(BM_flat_random)->UseRealTime();
+//
+//BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
+//BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
+//
+//BENCHMARK(BM_XY)->UseRealTime();
+//BENCHMARK(BM_YX)->UseRealTime();
 
-#if LIBHPC_USE_TBB
-BENCHMARK(BM_fill_zero_parallel_tbb);
-#endif
-
-BENCHMARK(BM_sin_serial);
-BENCHMARK(BM_sin_parallel_omp);
-
-#if LIBHPC_USE_TBB
-BENCHMARK(BM_sin_parallel_tbb);
-#endif
-
-BENCHMARK(BM_serial_simple_inc);
-BENCHMARK(BM_serial_complex_inc);
-BENCHMARK(BM_parallel_simple_inc);
-BENCHMARK(BM_parallel_complex_inc);
-
-BENCHMARK(BM_strided)
-    ->Arg(1)
-    ->Arg(2)
-    ->Arg(4)
-    ->Arg(8)
-    ->Arg(16)
-    ->Arg(32)
-    ->Arg(64)
-    ->Arg(128)
-    ->UseRealTime();
-
-BENCHMARK(BM_fill)
-    ->Arg(16 * 1024)
-    ->Arg(128 * 1024)
-    ->Arg(1024 * 1024)
-    ->Arg(16 * 1024 * 1024)
-    ->Arg(128 * 1024 * 1024)
-    ->Arg(1024 * 1024 * 1024)
-    ->UseRealTime();
-
-BENCHMARK(BM_AOS_partical)->UseRealTime();
-BENCHMARK(BM_SOA_partical)->UseRealTime();
-BENCHMARK(BM_AOSOA_partical)->UseRealTime();
-BENCHMARK(BM_AOS_all_properties)->UseRealTime();
-BENCHMARK(BM_SOA_all_properties)->UseRealTime();
-BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
-
-BENCHMARK(BM_ordered)->UseRealTime();
-BENCHMARK(BM_random)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
-BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
-
-BENCHMARK(BM_read)->UseRealTime();
-BENCHMARK(BM_read_and_write)->UseRealTime();
-BENCHMARK(BM_write)->UseRealTime();
-BENCHMARK(BM_write_zero)->UseRealTime();
-BENCHMARK(BM_write_one)->UseRealTime();
-BENCHMARK(BM_write_streamed)->UseRealTime();
-BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
-
-BENCHMARK(BM_origin)->UseRealTime();
-BENCHMARK(BM_init)->UseRealTime();
-
-BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
-BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
-BENCHMARK(BM_java_style_random)->UseRealTime();
-BENCHMARK(BM_flat_random)->UseRealTime();
-
-BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
-BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
-
-BENCHMARK(BM_XY)->UseRealTime();
-BENCHMARK(BM_YX)->UseRealTime();
+BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
+BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
 
 BENCHMARK(BM_x_blur);
 BENCHMARK(BM_x_blur_prefetch);
