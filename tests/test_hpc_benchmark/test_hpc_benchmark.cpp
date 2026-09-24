@@ -929,28 +929,38 @@ hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
 static void BM_XY(benchmark::State &bm) {
+          constexpr long long nx = 1 << 14;
+          constexpr long long ny = 1 << 11;
   std::vector<float> matrix2d(nx * ny);
+
   for (auto _ : bm) {
 #pragma omp parallel for collapse(2)
-    for (int x = 0; x < nx; ++x) {
-      for (int y = 0; y < ny; ++y) {
+    for (long long x = 0; x < nx; ++x) {
+      for (long long y = 0; y < ny; ++y) {
         matrix2d[x + y * nx] = 1.f;
       }
     }
-    benchmark::DoNotOptimize(matrix2d);
+    auto* data = matrix2d.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
   }
 }
 
 static void BM_YX(benchmark::State &bm) {
+          constexpr long long nx = 1 << 14;
+          constexpr long long ny = 1 << 11;
+
   std::vector<float> matrix2d(nx * ny);
   for (auto _ : bm) {
 #pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int x = 0; x < nx; ++x) {
+    for (long long y = 0; y < ny; ++y) {
+      for (long long x = 0; x < nx; ++x) {
         matrix2d[x + y * nx] = 1.f;
       }
     }
-    benchmark::DoNotOptimize(matrix2d);
+    auto* data = matrix2d.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
   }
 }
 
@@ -2179,6 +2189,9 @@ BENCHMARK(BM_flat_random)->UseRealTime();
 
 BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
 BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
+
+BENCHMARK(BM_XY)->UseRealTime();
+BENCHMARK(BM_YX)->UseRealTime();
 
 BENCHMARK(BM_x_blur);
 BENCHMARK(BM_x_blur_prefetch);
