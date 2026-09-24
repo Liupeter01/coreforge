@@ -929,8 +929,8 @@ hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
 hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
 static void BM_XY(benchmark::State &bm) {
-          constexpr long long nx = 1 << 14;
-          constexpr long long ny = 1 << 11;
+  constexpr long long nx = 1 << 14;
+  constexpr long long ny = 1 << 11;
   std::vector<float> matrix2d(nx * ny);
 
   for (auto _ : bm) {
@@ -940,15 +940,15 @@ static void BM_XY(benchmark::State &bm) {
         matrix2d[x + y * nx] = 1.f;
       }
     }
-    auto* data = matrix2d.data();
+    auto *data = matrix2d.data();
     benchmark::DoNotOptimize(data);
     benchmark::ClobberMemory();
   }
 }
 
 static void BM_YX(benchmark::State &bm) {
-          constexpr long long nx = 1 << 14;
-          constexpr long long ny = 1 << 11;
+  constexpr long long nx = 1 << 14;
+  constexpr long long ny = 1 << 11;
 
   std::vector<float> matrix2d(nx * ny);
   for (auto _ : bm) {
@@ -958,7 +958,7 @@ static void BM_YX(benchmark::State &bm) {
         matrix2d[x + y * nx] = 1.f;
       }
     }
-    auto* data = matrix2d.data();
+    auto *data = matrix2d.data();
     benchmark::DoNotOptimize(data);
     benchmark::ClobberMemory();
   }
