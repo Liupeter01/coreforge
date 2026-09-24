@@ -808,6 +808,61 @@ static void BM_init(benchmark::State &bm) {
   delete[] m;
 }
 
+static void BM_allocate_java_style_seq(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 9;
+  for (auto _ : bm) {
+    std::vector<std::vector<std::vector<float>>> dimension(
+        n, std::vector<std::vector<float>>(n, std::vector<float>(n)));
+    benchmark::DoNotOptimize(dimension);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_allocate_flat_seq(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 9;
+  for (auto _ : bm) {
+    std::vector<float> flat(n * n * n);
+    auto *data = flat.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_java_style_random(benchmark::State &bm) {
+  constexpr std::size_t n = 1 << 9;
+  std::vector<std::vector<std::vector<float>>> dimension(
+      n, std::vector<std::vector<float>>(n, std::vector<float>(n)));
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n * n * n; ++i) {
+      auto x = std::rand() % n;
+      auto y = std::rand() % n;
+      auto z = std::rand() % n;
+      dimension[x][y][z] = 1;
+    }
+    benchmark::DoNotOptimize(dimension);
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_flat_random(benchmark::State &bm) {
+
+  constexpr std::size_t n = 1 << 9;
+  std::vector<float> flat(n * n * n);
+
+  for (auto _ : bm) {
+    for (std::size_t i = 0; i < n * n * n; ++i) {
+      auto x = std::rand() % n;
+      auto y = std::rand() % n;
+      auto z = std::rand() % n;
+      flat[(x * n + y) * n + z] = 1;
+    }
+    auto *data = flat.data();
+    benchmark::DoNotOptimize(data);
+    benchmark::ClobberMemory();
+  }
+}
+
 constexpr std::size_t m = 1 << 13;
 constexpr std::size_t n = 1 << 15;
 std::vector<float> arr(n);
@@ -2093,6 +2148,11 @@ BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
 
 BENCHMARK(BM_origin)->UseRealTime();
 BENCHMARK(BM_init)->UseRealTime();
+
+BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
+BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
+BENCHMARK(BM_java_style_random)->UseRealTime();
+BENCHMARK(BM_flat_random)->UseRealTime();
 
 BENCHMARK(BM_x_blur);
 BENCHMARK(BM_x_blur_prefetch);
