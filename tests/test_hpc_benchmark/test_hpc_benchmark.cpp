@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <type_traits>
 #include <vector>
-#include <omp.h>
 
 #ifndef LIBHPC_USE_OPENMP
 #define LIBHPC_USE_OPENMP 0
@@ -864,57 +863,57 @@ static void BM_flat_random(benchmark::State &bm) {
   }
 }
 
-static void BM_with_false_sharing_issue(benchmark::State& bm) {
-          constexpr long long line = 1 << 28;
-          std::vector<float> false_sharing(line);
-          std::vector<float> temp(omp_get_max_threads());
+static void BM_with_false_sharing_issue(benchmark::State &bm) {
+  constexpr long long line = 1 << 28;
+  std::vector<float> false_sharing(line);
+  std::vector<float> temp(omp_get_max_threads());
 
-          benchmark::DoNotOptimize(temp.data());
+  benchmark::DoNotOptimize(temp.data());
 
-          for (auto _ : bm) {
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
-                              const int tid = omp_get_thread_num();
-                              temp[tid] = 0.0f;
+    {
+      const int tid = omp_get_thread_num();
+      temp[tid] = 0.0f;
 
 #pragma omp for schedule(static)
-                              for (long long i = 0; i < line; ++i) {
-                                        temp[tid] += false_sharing[i];
-                                        benchmark::ClobberMemory();
-                              }
-                    }
-                    benchmark::DoNotOptimize(temp.data());
-                    benchmark::ClobberMemory();
-          }
+      for (long long i = 0; i < line; ++i) {
+        temp[tid] += false_sharing[i];
+        benchmark::ClobberMemory();
+      }
+    }
+    benchmark::DoNotOptimize(temp.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_avoid_false_sharing_issue(benchmark::State& bm) {
+static void BM_avoid_false_sharing_issue(benchmark::State &bm) {
 
-          constexpr long long line = 1 << 28;
-          std::vector<float> false_sharing(line);
+  constexpr long long line = 1 << 28;
+  std::vector<float> false_sharing(line);
 
-          struct alignas(64) FalseSharingCounter {
-                    float value;
-          };
+  struct alignas(64) FalseSharingCounter {
+    float value;
+  };
 
-          std::vector<FalseSharingCounter> temp(omp_get_max_threads());
-          benchmark::DoNotOptimize(temp.data());
+  std::vector<FalseSharingCounter> temp(omp_get_max_threads());
+  benchmark::DoNotOptimize(temp.data());
 
-          for (auto _ : bm) {
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
-                              const int tid = omp_get_thread_num();
-                              temp[tid].value = 0.0f;
+    {
+      const int tid = omp_get_thread_num();
+      temp[tid].value = 0.0f;
 
 #pragma omp for schedule(static)
-                              for (long long i = 0; i < line; ++i) {
-                                        temp[tid].value += false_sharing[i];
-                                        benchmark::ClobberMemory();
-                              }
-                    }
-                    benchmark::DoNotOptimize(temp);
-                    benchmark::ClobberMemory();
-          }
+      for (long long i = 0; i < line; ++i) {
+        temp[tid].value += false_sharing[i];
+        benchmark::ClobberMemory();
+      }
+    }
+    benchmark::DoNotOptimize(temp);
+    benchmark::ClobberMemory();
+  }
 }
 
 constexpr std::size_t m = 1 << 13;
