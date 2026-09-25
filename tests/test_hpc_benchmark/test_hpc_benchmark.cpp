@@ -952,47 +952,47 @@ static void BM_YX(benchmark::State &bm) {
   }
 }
 
-static void BM_loop_fusion_seperate(benchmark::State& bm) {
-          constexpr long long n = 1 << 28;
-          std::vector<float> arr(n);
+static void BM_loop_fusion_seperate(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
 
-          for (auto _ : bm) {
-                    bm.PauseTiming();
-                    std::fill(arr.begin(), arr.end(), 1.f);
-                    bm.ResumeTiming();
+  for (auto _ : bm) {
+    bm.PauseTiming();
+    std::fill(arr.begin(), arr.end(), 1.f);
+    bm.ResumeTiming();
 
-                    /*the first loop*/
+    /*the first loop*/
 #pragma omp parallel for
-                    for (long long i = 0; i < n; ++i)
-                              arr[i] = arr[i] * 2.f;
+    for (long long i = 0; i < n; ++i)
+      arr[i] = arr[i] * 2.f;
 
-                    /*the second loop, the pervious cache needs to be reloaded*/
+    /*the second loop, the pervious cache needs to be reloaded*/
 #pragma omp parallel for
-                    for (long long i = 0; i < n; ++i)
-                              arr[i] = arr[i] + 1.0f;
+    for (long long i = 0; i < n; ++i)
+      arr[i] = arr[i] + 1.0f;
 
-                    benchmark::DoNotOptimize(arr.data());
-                    benchmark::ClobberMemory();
-          }
+    benchmark::DoNotOptimize(arr.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_loop_fusion_merged(benchmark::State& bm) {
-          constexpr long long n = 1 << 28;
-          std::vector<float> arr(n);
+static void BM_loop_fusion_merged(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
 
-          for (auto _ : bm) {
-                    bm.PauseTiming();
-                    std::fill(arr.begin(), arr.end(), 1.f);
-                    bm.ResumeTiming();
+  for (auto _ : bm) {
+    bm.PauseTiming();
+    std::fill(arr.begin(), arr.end(), 1.f);
+    bm.ResumeTiming();
 
 #pragma omp parallel for
-                    for (long long i = 0; i < n; ++i) {
-                              arr[i] = arr[i] * 2.f;   //the temp value may stay inside regs
-                              arr[i] = arr[i] + 1.0f;
-                    }
-                    benchmark::DoNotOptimize(arr.data());
-                    benchmark::ClobberMemory();
-          }
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = arr[i] * 2.f; // the temp value may stay inside regs
+      arr[i] = arr[i] + 1.0f;
+    }
+    benchmark::DoNotOptimize(arr.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 constexpr std::size_t m = 1 << 13;
