@@ -59,37 +59,39 @@ class HPCHighDimensionFlatArray {
 
   static_assert(Dimension > 0, "Dimension must larger than zero");
   static_assert(
-            std::is_same_v<std::remove_cv_t<std::remove_reference_t<_Ty>>, _Ty>,
-            "_Ty must not be cvref");
-  static_assert(!std::is_same_v<_Ty, bool>, "vector<bool> is not a flat array of bool objects");
+      std::is_same_v<std::remove_cv_t<std::remove_reference_t<_Ty>>, _Ty>,
+      "_Ty must not be cvref");
+  static_assert(!std::is_same_v<_Ty, bool>,
+                "vector<bool> is not a flat array of bool objects");
 
-  // index limit should stay inside numeric_limits<>::max, in order to avoid overflow after padding
+  // index limit should stay inside numeric_limits<>::max, in order to avoid
+  // overflow after padding
   static constexpr std::size_t index_limit =
-            static_cast<std::size_t>((std::numeric_limits<std::ptrdiff_t>::max)());
+      static_cast<std::size_t>((std::numeric_limits<std::ptrdiff_t>::max)());
   static_assert(Low_Bound <= index_limit, "Low_Bound is too large");
   static_assert(High_Bound <= index_limit - Low_Bound, "Padding is too large");
 
-  template<class I>
-  static std::size_t checked_dimension(I value) {
-            static_assert(std::is_integral_v<I> && !std::is_same_v<I, bool>,
-                      "Dimensions must be integers, excluding bool");
-            if constexpr (std::is_signed_v<I>) {
-                      if (value <= 0) throw std::invalid_argument("Dimension must be positive");
-            }
-            else {
-                      if (value == 0) throw std::invalid_argument("Dimension must be positive");
-            }
-            if (static_cast<std::uintmax_t>(value) > index_limit)
-                      throw std::length_error("Dimension cannot fit the index type");
-            return static_cast<std::size_t>(value);
+  template <class I> static std::size_t checked_dimension(I value) {
+    static_assert(std::is_integral_v<I> && !std::is_same_v<I, bool>,
+                  "Dimensions must be integers, excluding bool");
+    if constexpr (std::is_signed_v<I>) {
+      if (value <= 0)
+        throw std::invalid_argument("Dimension must be positive");
+    } else {
+      if (value == 0)
+        throw std::invalid_argument("Dimension must be positive");
+    }
+    if (static_cast<std::uintmax_t>(value) > index_limit)
+      throw std::length_error("Dimension cannot fit the index type");
+    return static_cast<std::size_t>(value);
   }
 
 public:
-
-          /// Private constructor used by delegating constructors.
-          explicit HPCHighDimensionFlatArray(const std::array<std::size_t, Dimension>& dims) {
-                    resize(dims);
-          }
+  /// Private constructor used by delegating constructors.
+  explicit HPCHighDimensionFlatArray(
+      const std::array<std::size_t, Dimension> &dims) {
+    resize(dims);
+  }
 
   /**
    * @brief Constructs the array with given per-dimension sizes.
@@ -103,8 +105,8 @@ public:
                  std::conjunction_v<std::is_integral<DimForEachLayer>...>),
                 int> = 0>
   explicit HPCHighDimensionFlatArray(const DimForEachLayer &...dims)
-      : HPCHighDimensionFlatArray(std::array<std::size_t, Dimension>{
-            checked_dimension(dims)...}) {}
+      : HPCHighDimensionFlatArray(
+            std::array<std::size_t, Dimension>{checked_dimension(dims)...}) {}
 
   std::size_t size() const noexcept { return _flat.size(); } // 包含 padding
 
@@ -123,9 +125,7 @@ public:
    */
   constexpr const _Ty *data() const noexcept { return _flat.data(); }
 
-  void zero() {
-    std::fill(_flat.begin(), _flat.end(), _Ty{});
-  }
+  void zero() { std::fill(_flat.begin(), _flat.end(), _Ty{}); }
 
   /**
    * @brief Accesses an element using a dimension array with bounds checking.
@@ -134,13 +134,12 @@ public:
    * @return Reference to the element at the given location.
    * @throws std::out_of_range if any index is outside padded bounds.
    */
-  _Ty& at(const std::array<std::ptrdiff_t, Dimension>& indices) {
-            return _flat[safe_linearize(indices)];
+  _Ty &at(const std::array<std::ptrdiff_t, Dimension> &indices) {
+    return _flat[safe_linearize(indices)];
   }
-  const _Ty& at(const std::array<std::ptrdiff_t, Dimension>& indices) const {
-            return _flat[safe_linearize(indices)];
+  const _Ty &at(const std::array<std::ptrdiff_t, Dimension> &indices) const {
+    return _flat[safe_linearize(indices)];
   }
-
 
   /**
    * @brief Direct element access without bounds checking.
@@ -149,17 +148,21 @@ public:
    * @param idxs Indices per dimension.
    * @return Reference to the element at the given location.
    */
-  template<typename... Indices,
-            std::enable_if_t<sizeof...(Indices) == Dimension &&
-            std::conjunction_v<std::is_integral<Indices>...>, int> = 0>
-  _Ty & operator()(const Indices&... indices) noexcept {
-            return _flat[unsafe_linearize({ static_cast<std::ptrdiff_t>(indices)... })];
+  template <
+      typename... Indices,
+      std::enable_if_t<sizeof...(Indices) == Dimension &&
+                           std::conjunction_v<std::is_integral<Indices>...>,
+                       int> = 0>
+  _Ty &operator()(const Indices &...indices) noexcept {
+    return _flat[unsafe_linearize({static_cast<std::ptrdiff_t>(indices)...})];
   }
-  template<typename... Indices,
-            std::enable_if_t<sizeof...(Indices) == Dimension &&
-            std::conjunction_v<std::is_integral<Indices>...>, int> = 0>
-  const _Ty & operator()(const Indices&... indices) const noexcept {
-            return _flat[unsafe_linearize({ static_cast<std::ptrdiff_t>(indices)... })];
+  template <
+      typename... Indices,
+      std::enable_if_t<sizeof...(Indices) == Dimension &&
+                           std::conjunction_v<std::is_integral<Indices>...>,
+                       int> = 0>
+  const _Ty &operator()(const Indices &...indices) const noexcept {
+    return _flat[unsafe_linearize({static_cast<std::ptrdiff_t>(indices)...})];
   }
 
 protected:
@@ -170,13 +173,14 @@ protected:
    * @param dim Dimension sizes per axis.
    * @param value Initial value to fill the flat buffer.
    */
-          void resize(const std::array<std::size_t, Dimension>& dims, const _Ty& value = _Ty{}) {
-                    const auto [stride, total] = compute_stride_and_total(dims);
-                    std::vector<_Ty, Alloc> next(total, value, _flat.get_allocator());
-                    _flat.swap(next);
-                    _dim = dims;
-                    _stride = stride;
-          }
+  void resize(const std::array<std::size_t, Dimension> &dims,
+              const _Ty &value = _Ty{}) {
+    const auto [stride, total] = compute_stride_and_total(dims);
+    std::vector<_Ty, Alloc> next(total, value, _flat.get_allocator());
+    _flat.swap(next);
+    _dim = dims;
+    _stride = stride;
+  }
 
   /**
    * @brief Applies ghost cell offset to an input index.
@@ -184,7 +188,7 @@ protected:
    * @return Internal flat index (with offset).
    */
   std::ptrdiff_t padded_index(std::ptrdiff_t value) const noexcept {
-            return value + static_cast<std::ptrdiff_t>(Low_Bound);
+    return value + static_cast<std::ptrdiff_t>(Low_Bound);
   }
 
   /**
@@ -193,22 +197,23 @@ protected:
    * @param dims Dimension sizes.
    * @return A pair containing the stride array and total element count.
    */
-  static auto compute_stride_and_total(const std::array<std::size_t, Dimension>& dims)
-            -> std::pair<std::array<std::size_t, Dimension>, std::size_t> {
-            std::array<std::size_t, Dimension> stride{};
-            std::size_t total = 1;
-            for (std::size_t i = Dimension; i-- > 0;) {
-                      if (dims[i] == 0)
-                                throw std::invalid_argument("Dimension must be positive");
-                      if (dims[i] > index_limit - Low_Bound - High_Bound)
-                                throw std::length_error("Padded dimension is too large");
-                      const auto extent = dims[i] + Low_Bound + High_Bound;
-                      stride[i] = total;
-                      if (total > index_limit / extent)
-                                throw std::length_error("Total element count is too large");
-                      total *= extent;
-            }
-            return { stride, total };
+  static auto
+  compute_stride_and_total(const std::array<std::size_t, Dimension> &dims)
+      -> std::pair<std::array<std::size_t, Dimension>, std::size_t> {
+    std::array<std::size_t, Dimension> stride{};
+    std::size_t total = 1;
+    for (std::size_t i = Dimension; i-- > 0;) {
+      if (dims[i] == 0)
+        throw std::invalid_argument("Dimension must be positive");
+      if (dims[i] > index_limit - Low_Bound - High_Bound)
+        throw std::length_error("Padded dimension is too large");
+      const auto extent = dims[i] + Low_Bound + High_Bound;
+      stride[i] = total;
+      if (total > index_limit / extent)
+        throw std::length_error("Total element count is too large");
+      total *= extent;
+    }
+    return {stride, total};
   }
 
   /**
@@ -218,28 +223,30 @@ protected:
    * @param insert Index per dimension (including ghost access).
    * @return Flat memory offset.
    */
-  std::size_t unsafe_linearize(const std::array<std::ptrdiff_t, Dimension>& indices) const noexcept {
-            std::size_t result = 0;
-            for (std::size_t i = 0; i < Dimension; ++i)
-                      result += _stride[i] * static_cast<std::size_t>(padded_index(indices[i]));
-            return result;
+  std::size_t unsafe_linearize(
+      const std::array<std::ptrdiff_t, Dimension> &indices) const noexcept {
+    std::size_t result = 0;
+    for (std::size_t i = 0; i < Dimension; ++i)
+      result += _stride[i] * static_cast<std::size_t>(padded_index(indices[i]));
+    return result;
   }
 
   /**
- * @brief Converts a multi-dimensional padded index to a flat offset (with
- * bounds check).
- *
- * @param insert Index per dimension.
- * @return Flat memory offset.
- * @throws std::out_of_range if any index exceeds bounds.
- */
-  std::size_t safe_linearize(const std::array<std::ptrdiff_t, Dimension>& indices) const {
-            for (std::size_t i = 0; i < Dimension; ++i) {
-                      if (indices[i] < -static_cast<std::ptrdiff_t>(Low_Bound) ||
-                                indices[i] >= static_cast<std::ptrdiff_t>(_dim[i] + High_Bound))
-                                throw std::out_of_range("invalid index, out of boundary");
-            }
-            return unsafe_linearize(indices);
+   * @brief Converts a multi-dimensional padded index to a flat offset (with
+   * bounds check).
+   *
+   * @param insert Index per dimension.
+   * @return Flat memory offset.
+   * @throws std::out_of_range if any index exceeds bounds.
+   */
+  std::size_t
+  safe_linearize(const std::array<std::ptrdiff_t, Dimension> &indices) const {
+    for (std::size_t i = 0; i < Dimension; ++i) {
+      if (indices[i] < -static_cast<std::ptrdiff_t>(Low_Bound) ||
+          indices[i] >= static_cast<std::ptrdiff_t>(_dim[i] + High_Bound))
+        throw std::out_of_range("invalid index, out of boundary");
+    }
+    return unsafe_linearize(indices);
   }
 
 private:

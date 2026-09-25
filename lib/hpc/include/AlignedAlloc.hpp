@@ -50,8 +50,7 @@ template <typename T, size_t Align = 64> class AlignedAllocator;
 template <size_t Align> class AlignedAllocator<void, Align> {
   static_assert(Align >= alignof(void *),
                 "Align must satisfy the platform allocation alignment");
-  static_assert((Align & (Align - 1)) == 0,
-                "Align must be a power of two");
+  static_assert((Align & (Align - 1)) == 0, "Align must be a power of two");
 
 public:
   typedef void *pointer;
@@ -67,8 +66,7 @@ template <typename T, size_t Align> class AlignedAllocator {
   static_assert(Align >= alignof(void *),
                 "Align must satisfy the platform allocation alignment");
   static_assert(Align >= alignof(T), "Align must satisfy T's alignment");
-  static_assert((Align & (Align - 1)) == 0,
-                "Align must be a power of two");
+  static_assert((Align & (Align - 1)) == 0, "Align must be a power of two");
 
 public:
   typedef T value_type;
@@ -130,8 +128,7 @@ template <typename T, size_t Align> class AlignedAllocator<const T, Align> {
   static_assert(Align >= alignof(void *),
                 "Align must satisfy the platform allocation alignment");
   static_assert(Align >= alignof(T), "Align must satisfy T's alignment");
-  static_assert((Align & (Align - 1)) == 0,
-                "Align must be a power of two");
+  static_assert((Align & (Align - 1)) == 0, "Align must be a power of two");
 
 public:
   typedef T value_type;
