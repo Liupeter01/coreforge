@@ -916,18 +916,6 @@ static void BM_avoid_false_sharing_issue(benchmark::State &bm) {
   }
 }
 
-constexpr std::size_t m = 1 << 13;
-constexpr std::size_t n = 1 << 15;
-std::vector<float> arr(n);
-
-#define N (1024 * 1024)
-
-constexpr int nblur = 8;
-constexpr std::size_t nx = 1 << 13;
-constexpr std::size_t ny = 1 << 13;
-hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
-hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
-
 static void BM_XY(benchmark::State &bm) {
   constexpr long long nx = 1 << 14;
   constexpr long long ny = 1 << 11;
@@ -963,6 +951,61 @@ static void BM_YX(benchmark::State &bm) {
     benchmark::ClobberMemory();
   }
 }
+
+static void BM_loop_fusion_seperate(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    bm.PauseTiming();
+    std::fill(arr.begin(), arr.end(), 1.f);
+    bm.ResumeTiming();
+
+    /*the first loop*/
+#pragma omp parallel for
+    for (long long i = 0; i < n; ++i)
+      arr[i] = arr[i] * 2.f;
+
+    /*the second loop, the pervious cache needs to be reloaded*/
+#pragma omp parallel for
+    for (long long i = 0; i < n; ++i)
+      arr[i] = arr[i] + 1.0f;
+
+    benchmark::DoNotOptimize(arr.data());
+    benchmark::ClobberMemory();
+  }
+}
+
+static void BM_loop_fusion_merged(benchmark::State &bm) {
+  constexpr long long n = 1 << 28;
+  std::vector<float> arr(n);
+
+  for (auto _ : bm) {
+    bm.PauseTiming();
+    std::fill(arr.begin(), arr.end(), 1.f);
+    bm.ResumeTiming();
+
+#pragma omp parallel for
+    for (long long i = 0; i < n; ++i) {
+      arr[i] = arr[i] * 2.f; // the temp value may stay inside regs
+      arr[i] = arr[i] + 1.0f;
+    }
+    benchmark::DoNotOptimize(arr.data());
+    benchmark::ClobberMemory();
+  }
+}
+
+constexpr std::size_t m = 1 << 13;
+constexpr std::size_t n = 1 << 15;
+std::vector<float> arr(n);
+
+#define N (1024 * 1024)
+
+constexpr int nblur = 8;
+constexpr std::size_t nx = 1 << 13;
+constexpr std::size_t ny = 1 << 13;
+hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
+hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
 
 static void BM_x_blur(benchmark::State &bm) {
   for (auto _ : bm) {
@@ -2192,6 +2235,9 @@ BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
 
 BENCHMARK(BM_XY)->UseRealTime();
 BENCHMARK(BM_YX)->UseRealTime();
+
+BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
+BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
 
 BENCHMARK(BM_x_blur);
 BENCHMARK(BM_x_blur_prefetch);
