@@ -8,3 +8,4 @@
 /CMakePresets.json
 /CMakeUserPresets.json
 build
+/build-*/
