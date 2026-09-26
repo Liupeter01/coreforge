@@ -36,7 +36,53 @@ test-framework downloads. They can be requested explicitly with
 
 ---
 
-## 0x03 GPU Performance Optimization Highlights
+## 0x03 Debug Sanitizer Builds
+
+Coreforge supports separate Debug build directories for AddressSanitizer and
+ThreadSanitizer on Linux and macOS. ASan and TSan cannot be combined, so use a
+different build directory for each one.
+
+`LIBHPC_SANITIZER` accepts the following values:
+
+| Value | Debug instrumentation |
+|-------|-----------------------|
+| `address` | AddressSanitizer (`address,leak` on Linux; `address` on macOS) |
+| `thread` | ThreadSanitizer |
+| `none` | No sanitizer |
+
+Sanitizer flags are applied only to the Debug configuration. Release,
+RelWithDebInfo, and MinSizeRel builds remain uninstrumented so that benchmark
+timings are not distorted.
+
+Configure, build, and run the ASan tests:
+
+```sh
+cmake -S . -B build-asan \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DLIBHPC_BUILD_TESTING=ON \
+  -DLIBHPC_SANITIZER=address
+cmake --build build-asan -j
+ctest --test-dir build-asan --output-on-failure
+```
+
+Configure, build, and run the TSan tests:
+
+```sh
+cmake -S . -B build-tsan \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DLIBHPC_BUILD_TESTING=ON \
+  -DLIBHPC_SANITIZER=thread
+cmake --build build-tsan -j
+ctest --test-dir build-tsan --output-on-failure
+```
+
+For a Debug build without instrumentation, use
+`-DLIBHPC_SANITIZER=none`. Sanitizer selection is not currently configured for
+Windows builds.
+
+---
+
+## 0x04 GPU Performance Optimization Highlights
 libHPC includes GPU-accelerated kernels optimized for high-throughput computation on NVIDIA CUDA-compatible devices:
 - **Radix-Sort Kernel:** Processes 500M elements in ~360ms on an RTX 3080 Ti(laptop), sustaining ~1.39B elements/sec throughput.  
 - **Warp-Synchronous & Tiled Memory Layouts:** Maximizes shared memory utilization and minimizes global memory latency.  
