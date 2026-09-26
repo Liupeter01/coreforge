@@ -4,20 +4,47 @@ project(LIBHPC_test LANGUAGES CXX C)
 include(FetchContent)
 
 # Sanitizers are useful for correctness testing, but they invalidate benchmark
-# timings. Keep Release-family builds uninstrumented and enable them only for
-# the Debug configuration. Generator expressions also work with multi-config
-# generators such as Xcode and Visual Studio.
+# timings and ASan cannot be combined with TSan. Select exactly one sanitizer
+# for Debug builds; Release-family builds remain uninstrumented.
+set(LIBHPC_SANITIZER
+    "address"
+    CACHE STRING "Sanitizer for Debug tests: none, address, or thread")
+set_property(CACHE LIBHPC_SANITIZER PROPERTY STRINGS none address thread)
+string(TOLOWER "${LIBHPC_SANITIZER}" LIBHPC_SANITIZER_NORMALIZED)
+
+if(NOT LIBHPC_SANITIZER_NORMALIZED MATCHES "^(none|address|thread)$")
+  message(
+    FATAL_ERROR
+      "Unsupported LIBHPC_SANITIZER='${LIBHPC_SANITIZER}'. Use none, address, or thread."
+  )
+endif()
+
+set(LIBHPC_SANITIZER_FLAG "")
 if(UNIX AND NOT APPLE)
-  message(STATUS "Configuring tests for Linux (sanitizers enabled in Debug)")
-  add_compile_options($<$<CONFIG:Debug>:-fsanitize=address,leak>)
-  add_link_options($<$<CONFIG:Debug>:-fsanitize=address,leak>)
+  if(LIBHPC_SANITIZER_NORMALIZED STREQUAL "address")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=address,leak)
+  elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "thread")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=thread)
+  endif()
 elseif(APPLE)
-  message(STATUS "Configuring tests for macOS (AddressSanitizer enabled in Debug)")
-  add_compile_options($<$<CONFIG:Debug>:-fsanitize=address>)
-  add_link_options($<$<CONFIG:Debug>:-fsanitize=address>)
-elseif(WIN32)
-  message(WARNING "Sanitizers not yet configured for Windows Debug builds")
-  # ASan for MSVC or clang-cl requires compiler-specific handling.
+  if(LIBHPC_SANITIZER_NORMALIZED STREQUAL "address")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=address)
+  elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "thread")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=thread)
+  endif()
+elseif(NOT LIBHPC_SANITIZER_NORMALIZED STREQUAL "none")
+  message(WARNING "Sanitizers are not configured for this platform")
+endif()
+
+if(LIBHPC_SANITIZER_FLAG)
+  message(
+    STATUS
+      "Configuring Debug tests with ${LIBHPC_SANITIZER_NORMALIZED} sanitizer")
+  add_compile_options($<$<CONFIG:Debug>:${LIBHPC_SANITIZER_FLAG}>
+                      $<$<CONFIG:Debug>:-fno-omit-frame-pointer>)
+  add_link_options($<$<CONFIG:Debug>:${LIBHPC_SANITIZER_FLAG}>)
+else()
+  message(STATUS "Configuring tests without sanitizers")
 endif()
 
 FetchContent_Declare(
