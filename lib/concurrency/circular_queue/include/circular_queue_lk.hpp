@@ -9,6 +9,9 @@ class CircularQueueLk : private std::allocator<_Ty> {
   CircularQueueLk(const CircularQueueLk &) = delete;
   CircularQueueLk &operator=(const CircularQueueLk &) = delete;
 
+  static_assert(_Size > 0 && _Size < std::numeric_limits<std::size_t>::max(),
+                "_Size must >0 and < std::size_t max");
+
 public:
   CircularQueueLk()
       : m_max_size(_Size + 1),
