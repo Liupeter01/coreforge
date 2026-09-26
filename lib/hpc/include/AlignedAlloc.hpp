@@ -29,20 +29,43 @@ inline size_t round_up_to_alignment(size_t size, size_t alignment) {
   return size + padding;
 }
 
-inline void *allocate_aligned_memory(size_t align, size_t size) {
-#ifdef _MSC_VER
-  return _aligned_malloc(size, align);
+inline void *allocate_aligned_memory(size_t alignment, size_t size) {
+#if defined(_MSC_VER)
+  return _aligned_malloc(size, alignment);
+#elif defined(__APPLE__) || defined(__linux__)
+  // macOS posix_memalign；Linux aligned_alloc
+  void *ptr = nullptr;
+  return posix_memalign(&ptr, alignment, size) == 0 ? ptr : nullptr;
 #else
-  return std::aligned_alloc(align, round_up_to_alignment(size, align));
+  // fallback: malloc + manual alignment
+  const size_t overhead = alignment + sizeof(void *);
+  char *base = static_cast<char *>(std::malloc(overhead + size));
+  if (!base)
+    return nullptr;
+  char *aligned =
+      base + sizeof(void *) +
+      (alignment -
+       (reinterpret_cast<uintptr_t>(base + sizeof(void *)) % alignment)) %
+          alignment;
+  *reinterpret_cast<void **>(aligned - sizeof(void *)) = base;
+  return aligned;
 #endif
 }
+
 inline void deallocate_aligned_memory(void *ptr) noexcept {
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
   _aligned_free(ptr);
+#elif defined(__APPLE__) || defined(__linux__)
+  std::free(ptr); // posix_memalign
 #else
-  std::free(ptr);
+  if (ptr) {
+    void *base =
+        *reinterpret_cast<void **>(static_cast<char *>(ptr) - sizeof(void *));
+    std::free(base);
+  }
 #endif
 }
+
 } // namespace detail
 
 template <typename T, size_t Align = 64> class AlignedAllocator;
