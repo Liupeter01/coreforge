@@ -27,7 +27,9 @@ template <typename _Ty> class concurrency::LinkListLK {
   LinkListLK &operator=(LinkListLK &&) = delete;
 
 public:
-  LinkListLK() : m_head(std::make_unique<Node>()) { m_tail = m_head.get(); }
+  LinkListLK() : m_size(0), m_head(std::make_unique<Node>()) {
+    m_tail = m_head.get();
+  }
   virtual ~LinkListLK() {
     remove_if([](const auto &value) { return true; });
   }
@@ -135,7 +137,7 @@ public:
   }
 
 private:
-  std::atomic<std::size_t> m_size;
+  std::atomic<std::size_t> m_size{};
   std::unique_ptr<Node> m_head;
   Node *m_tail;
   std::mutex m_tail_mtx;
