@@ -14,8 +14,14 @@ template <typename _Ty> class concurrency::ConcurrentQueue {
   ConcurrentQueue(const ConcurrentQueue &) = delete;
   ConcurrentQueue &operator=(const ConcurrentQueue &) = delete;
 
+  // Permanent terminal state for Node::data. Unlike nullptr, this tag prevents
+  // a stalled producer from refilling a node after a consumer has retired it.
+  // Node::data stores void*, so the tag remains an untyped address and only
+  // actual data pointers are converted back to _Ty*.
+  inline static char consumed_tag{};
+
 public:
-  ConcurrentQueue() {
+  ConcurrentQueue() : m_size(0) {
     ReferenceNode<_Ty> init_node;
     init_node.node = new Node<_Ty>;
     init_node.thread_ref_counter = 1;
@@ -26,6 +32,10 @@ public:
   virtual ~ConcurrentQueue() { clear(); }
 
 public:
+  // TODO(correctness): this currently deletes the final dummy without
+  // resetting m_head/m_tail. An explicit clear(), a later reuse, or the
+  // destructor's second clear() therefore dereferences dangling state. Public
+  // clear should only drain; destruction should reclaim the final dummy once.
   void clear() {
     while (pop().has_value())
       ;
@@ -39,7 +49,9 @@ public:
                 : false);
   }
 
-  /*Maybe Approximate!*/
+  // Approximate while operations overlap. Because push increments after tail
+  // publication, a concurrent pop can decrement first and temporarily wrap
+  // this unsigned counter to SIZE_MAX.
   const std::size_t size() const { return m_size; }
 
   void push(_Ty &&value) { __push(std::make_unique<_Ty>(std::move(value))); }
@@ -69,14 +81,26 @@ protected:
     for (;;) {
       old_tail = __increase_ref_rmw(m_tail, old_tail);
 
-      [[maybe_unused]] _Ty *old_data{nullptr};
+      void *old_data{nullptr};
+      void *new_data = value.get();
+      // Release publishes the constructed value through data. On failure,
+      // old_data is used only to detect that another producer claimed this
+      // slot, so the failed load does not need acquire ordering.
+      //
+      // Only nullptr is claimable. The terminal consumed_tag makes the state
+      // transition one-way: nullptr -> value -> consumed_tag. Consequently, a
+      // stale producer cannot resurrect an already retired node.
       if (old_tail.node->data.compare_exchange_strong(
-              old_data, value.get(), std::memory_order_release,
-              std::memory_order_acquire)) {
+              old_data, new_data, std::memory_order_release,
+              std::memory_order_relaxed)) {
 
         ReferenceNode<_Ty> old_next{};
+        // A failed CAS is a load and overwrites old_next. Because that returned
+        // node is immediately republished through m_tail, failure must acquire
+        // its publication. Success is acq_rel so failure-acquire is valid,
+        // while the release half publishes new_next.
         if (!old_tail.node->next.compare_exchange_strong(
-                old_next, new_next, std::memory_order_release,
+                old_next, new_next, std::memory_order_acq_rel,
                 std::memory_order_acquire)) {
           delete new_next.node;
           new_next = old_next;
@@ -90,8 +114,9 @@ protected:
       }
 
       ReferenceNode<_Ty> old_next{};
+      // Same acquire-before-republish rule as the next CAS above.
       if (old_tail.node->next.compare_exchange_strong(
-              old_next, new_next, std::memory_order_release,
+              old_next, new_next, std::memory_order_acq_rel,
               std::memory_order_acquire)) {
         /*new_tail*/ old_next = /*old_tail*/ new_next;
         new_next.node = new Node<_Ty>; // for next iteration!
@@ -110,7 +135,9 @@ protected:
     for (;;) {
       old_head = __increase_ref_rmw(m_head, old_head);
 
-      /*safty consideration, UB happened*/
+      // Defensive invariant check only: after successful construction, a live
+      // queue must never have a null head. Reaching this branch indicates an
+      // invalid packed pointer or an already-corrupted object lifetime.
       if (!old_head.node) {
         __release_curr_thread_ref(old_head);
         return std::nullopt;
@@ -121,28 +148,49 @@ protected:
         return std::nullopt;
       }
 
-      // if old_head is wrong! then old_head.node->next.load() is also wrong!
-      auto next = old_head.node->next.load(std::memory_order_relaxed);
+      // compare_exchange failure replaces old_head with the current head.
+      // Preserve the node whose reference this iteration actually acquired;
+      // otherwise a losing consumer decrements the new head instead of the old
+      // one, corrupting its count and allowing a premature
+      // delete/use-after-free.
+      ReferenceNode<_Ty> backup = old_head;
+      Node<_Ty> *ptr = backup.node;
+
+      // next can be linked after ptr itself was published. Acquire next before
+      // release-publishing it through m_head, preserving the transitive chain.
+      auto next = ptr->next.load(std::memory_order_acquire);
+      // Failure is relaxed because its replacement old_head is only fed back
+      // into __increase_ref_rmw; that successful RMW acquires before use.
       if (m_head.compare_exchange_strong(old_head, next,
                                          std::memory_order_release,
-                                         std::memory_order_acquire)) {
-        _Ty *res = old_head.node->data.exchange(nullptr);
-        __remove_node_from_heap(old_head); // delete node!
+                                         std::memory_order_relaxed)) {
+        // Acquire consumes the producer's data-release before res is used. The
+        // same atomic RMW installs the permanent consumed_tag; its write side
+        // needs no release because other threads use the tag only as a state.
+        void *res =
+            ptr->data.exchange(consumed_ptr(), std::memory_order_acquire);
+        // Transfer the winner's external references into the protected old
+        // head. This call reclaims it only if its RMW owns the zero transition;
+        // otherwise the last losing consumer performs reclamation later.
+        __remove_node_from_heap(old_head);
         --m_size;
-        return std::unique_ptr<_Ty>(res);
+        return std::unique_ptr<_Ty>(static_cast<_Ty *>(res));
       }
 
-      // old_head = m_head.load();
-      __release_curr_thread_ref(old_head);
+      // Do not release old_head here: the failed CAS overwrote it with the new
+      // head. Release ptr, the exact node protected above.
+      ptr->release_curr_thread_ref();
     }
   }
 
 private:
+  static void *consumed_ptr() noexcept { return &consumed_tag; }
+
   void update_new_tail(ReferenceNode<_Ty> &old_tail,
                        const ReferenceNode<_Ty> &new_tail) {
     Node<_Ty> *backup = old_tail.node;
     while (!m_tail.compare_exchange_weak(old_tail, new_tail,
-                                         std::memory_order_release,
+                                         std::memory_order_acq_rel,
                                          std::memory_order_acquire) &&
            backup == old_tail.node)
       ;
@@ -157,12 +205,21 @@ private:
   static ReferenceNode<_Ty>
   __increase_ref_rmw(AtomicReferenceNode<_Ty> &main_node,
                      ReferenceNode<_Ty> &old) {
+    // A successful CAS is an RMW in this atomic's modification order. Acquire
+    // makes the node's publication visible before it is dereferenced; release
+    // is conservative and is not required merely to extend a release sequence.
+    // A failed CAS is only a load: it merely refreshes old for the next
+    // attempt, whose eventual successful RMW performs the acquire, so failure
+    // is relaxed.
     ReferenceNode<_Ty> new_ref;
     do {
       new_ref = old;
+      // TODO(correctness): this packed field is bounded (17 bits with the
+      // current Apple layout, 16 on x86-64). Repeated empty pops keep raising
+      // the same head's external count, so silent wrap must be prevented.
       new_ref.thread_ref_counter += 1;
     } while (!main_node.compare_exchange_weak(
-        old, new_ref, std::memory_order_release, std::memory_order_acquire));
+        old, new_ref, std::memory_order_acq_rel, std::memory_order_relaxed));
     return new_ref;
   }
 
@@ -179,19 +236,12 @@ private:
     old.node->release_curr_thread_ref();
   }
 
-  static const bool __remove_data(ReferenceNode<_Ty> &old) {
-    if (!old.node)
-      return false;
-    return old.node->remove_data();
-  }
-
-  static const bool __remove_node_from_heap(ReferenceNode<_Ty> &old) {
+  static void __remove_node_from_heap(ReferenceNode<_Ty> &old) {
     __sync_threads_ref(old);
-    return __remove_data(old);
   }
 
 private:
-  std::atomic<std::size_t> m_size;
+  std::atomic<std::size_t> m_size{};
   AtomicReferenceNode<_Ty> m_head;
   AtomicReferenceNode<_Ty> m_tail;
 };
