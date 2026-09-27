@@ -8,14 +8,14 @@ include(FetchContent)
 # for Debug builds; Release-family builds remain uninstrumented.
 set(LIBHPC_SANITIZER
     "address"
-    CACHE STRING "Sanitizer for Debug tests: none, address, or thread")
-set_property(CACHE LIBHPC_SANITIZER PROPERTY STRINGS none address thread)
+    CACHE STRING "Sanitizer for Debug tests: none, address, undefined, or thread")
+set_property(CACHE LIBHPC_SANITIZER PROPERTY STRINGS none address undefined thread)
 string(TOLOWER "${LIBHPC_SANITIZER}" LIBHPC_SANITIZER_NORMALIZED)
 
-if(NOT LIBHPC_SANITIZER_NORMALIZED MATCHES "^(none|address|thread)$")
+if(NOT LIBHPC_SANITIZER_NORMALIZED MATCHES "^(none|address|thread|undefined)$")
   message(
     FATAL_ERROR
-      "Unsupported LIBHPC_SANITIZER='${LIBHPC_SANITIZER}'. Use none, address, or thread."
+      "Unsupported LIBHPC_SANITIZER='${LIBHPC_SANITIZER}'. Use none, address, undefined, or thread."
   )
 endif()
 
@@ -25,12 +25,16 @@ if(UNIX AND NOT APPLE)
     set(LIBHPC_SANITIZER_FLAG -fsanitize=address,leak)
   elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "thread")
     set(LIBHPC_SANITIZER_FLAG -fsanitize=thread)
+  elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "undefined")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=undefined)
   endif()
 elseif(APPLE)
   if(LIBHPC_SANITIZER_NORMALIZED STREQUAL "address")
     set(LIBHPC_SANITIZER_FLAG -fsanitize=address)
   elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "thread")
     set(LIBHPC_SANITIZER_FLAG -fsanitize=thread)
+  elseif(LIBHPC_SANITIZER_NORMALIZED STREQUAL "undefined")
+    set(LIBHPC_SANITIZER_FLAG -fsanitize=undefined)
   endif()
 elseif(NOT LIBHPC_SANITIZER_NORMALIZED STREQUAL "none")
   message(WARNING "Sanitizers are not configured for this platform")
