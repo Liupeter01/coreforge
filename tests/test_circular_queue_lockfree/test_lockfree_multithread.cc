@@ -69,6 +69,8 @@ void run_concurrent_circular_queue_test(const ConcurrencyTestParam &param) {
   for (auto &thread : consumers)
     thread.join();
 
+  // This checks the net count, not exactly-once delivery: a duplicate can mask
+  // a lost value unless a separate value-level check is added.
   EXPECT_EQ(total_popped.load(std::memory_order_relaxed), param.total_values);
 
   std::size_t value{};

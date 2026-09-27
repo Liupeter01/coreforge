@@ -72,8 +72,10 @@ void run_concurrent_queue_test(const ConcurrencyTestParam &param) {
   for (auto &thread : consumers)
     thread.join();
 
-  // A shared total turns a lost/resurrected item into an assertion failure.
-  // Fixed per-consumer quotas would instead turn the same bug into a hang.
+  // A shared total detects a net loss or excess without turning it into the
+  // hang caused by fixed per-consumer quotas. It does not prove exactly-once:
+  // one duplicate can mask one lost value, so value-level tracking is still a
+  // useful follow-up test.
   EXPECT_EQ(total_popped.load(std::memory_order_relaxed), param.total_values);
   EXPECT_TRUE(queue.empty());
 }
