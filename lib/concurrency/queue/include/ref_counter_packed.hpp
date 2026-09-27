@@ -6,17 +6,20 @@
 
 namespace concurrency {
 /*
- * [ 63 : 2 ] ！！ thread_ref_counter (62 or 30)
- * [  1 : 0 ] ！！ head_and_tail_ref_counter
+ * [ word_bits - 1 : 2 ] thread_ref_counter
+ * [             1 : 0 ] head_and_tail_ref_counter
+ *
+ * thread_ref_counter is a logical signed delta stored as an unsigned residue
+ * in the upper field. Losing consumers may decrement it before the winner
+ * transfers the external references, so a temporarily negative logical value
+ * is part of the reclamation protocol rather than an underflow by itself.
  */
 struct alignas(16) ref_counter_packed {
 
-  using packed_t = std::intptr_t;
+  using packed_t = std::uintptr_t;
   static constexpr int HEAD_TAIL_BITS = 2;
   static constexpr packed_t HEAD_TAIL_MASK = (1 << HEAD_TAIL_BITS) - 1;
   static constexpr int THREAD_REF_SHIFT = HEAD_TAIL_BITS;
-
-  bool both_zero() const { return !counter.load(std::memory_order_acquire); }
 
   int get_threads_ref() const {
     return static_cast<int>(counter.load(std::memory_order_acquire) >>
@@ -39,13 +42,13 @@ struct alignas(16) ref_counter_packed {
 
       thread_ref += 1;
 
-      new_val = (thread_ref << THREAD_REF_SHIFT) | (head_tail & HEAD_TAIL_MASK);
+      new_val = (static_cast<std::size_t>(thread_ref) << THREAD_REF_SHIFT) |
+                (head_tail & HEAD_TAIL_MASK);
     } while (!counter.compare_exchange_weak(old_val, new_val,
-                                            std::memory_order_release,
-                                            std::memory_order_acquire));
+                                            std::memory_order_relaxed));
   }
 
-  void dec_thread_ref() {
+  bool dec_thread_ref() {
     packed_t old_val = counter.load(std::memory_order_relaxed);
     packed_t new_val;
     do {
@@ -54,17 +57,24 @@ struct alignas(16) ref_counter_packed {
       std::intptr_t head_tail =
           static_cast<std::intptr_t>(old_val & HEAD_TAIL_MASK);
 
+      // A losing consumer may run before the winner transfers the external
+      // references, so the logical thread_ref may temporarily be negative.
       thread_ref -= 1;
 
-      new_val = (thread_ref << THREAD_REF_SHIFT) | (head_tail & HEAD_TAIL_MASK);
+      // Convert before shifting so that temporary negative value is encoded
+      // with defined unsigned modular arithmetic in the upper packed field.
+      new_val = (static_cast<std::size_t>(thread_ref) << THREAD_REF_SHIFT) |
+                (head_tail & HEAD_TAIL_MASK);
     } while (!counter.compare_exchange_weak(old_val, new_val,
-                                            std::memory_order_release,
-                                            std::memory_order_acquire));
+                                            std::memory_order_acq_rel,
+                                            std::memory_order_relaxed));
+
+    return (0 == new_val);
   }
 
   void dec_head_tail_ref() { counter.fetch_sub(1, std::memory_order_acq_rel); }
 
-  void sync_threads_ref(std::intptr_t any_other_threads) {
+  bool sync_threads_ref(std::intptr_t any_other_threads) {
     packed_t old_val = counter.load(std::memory_order_relaxed);
     packed_t new_val;
     do {
@@ -80,10 +90,16 @@ struct alignas(16) ref_counter_packed {
         throw std::runtime_error("head_tail underflow");
       }
 
-      new_val = (thread_ref << THREAD_REF_SHIFT) | (head_tail & HEAD_TAIL_MASK);
+      // Use the same unsigned modular encoding as dec_thread_ref(). The
+      // winner's transferred external references cancel releases that losing
+      // consumers may already have recorded against this node.
+      new_val = (static_cast<std::size_t>(thread_ref) << THREAD_REF_SHIFT) |
+                (head_tail & HEAD_TAIL_MASK);
     } while (!counter.compare_exchange_weak(old_val, new_val,
-                                            std::memory_order_release,
-                                            std::memory_order_acquire));
+                                            std::memory_order_acq_rel,
+                                            std::memory_order_relaxed));
+
+    return (0 == new_val);
   }
 
   std::atomic<packed_t> counter{
