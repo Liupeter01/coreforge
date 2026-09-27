@@ -12,33 +12,41 @@ template <typename _Ty> struct ReferenceNode;
 template <typename _Ty> struct AtomicReferenceNode;
 
 template <typename _Ty> struct Node {
-  Node() : data(nullptr), inner_ref_counter{} {
+  Node() : inner_ref_counter{} {
 
     ReferenceNode<_Ty> node;
     node.node = nullptr;
     node.thread_ref_counter = 0;
-    next.store(node);
+
+    next.store(node, std::memory_order_release);
+    data.store(nullptr, std::memory_order_release);
   }
 
+  // Transferring the external references is an acq_rel RMW. Its acquire half
+  // joins the preceding release/RMW chain on this counter; if it writes the
+  // complete zero value, this thread uniquely owns reclamation.
   void sync_threads_ref(const std::intptr_t any_other_threads) {
-    inner_ref_counter.sync_threads_ref(any_other_threads);
-  }
-
-  void release_curr_thread_ref() { inner_ref_counter.dec_thread_ref(); }
-
-  bool remove_data() {
-    if (inner_ref_counter.both_zero()) {
+    if (inner_ref_counter.sync_threads_ref(any_other_threads)) {
       delete this;
-      return true;
     }
-    return false;
   }
+
+  // This acq_rel RMW likewise joins the counter's synchronization chain. Only
+  // the RMW that changes the complete packed count to zero may reclaim the
+  // node, preventing both missed deletion and a competing double delete.
+  void release_curr_thread_ref() {
+    if (inner_ref_counter.dec_thread_ref()) {
+      delete this;
+    }
+  }
+
   AtomicReferenceNode<_Ty> next;
-  std::atomic<_Ty *> data;
+  std::atomic<void *> data;
   ref_counter_packed inner_ref_counter;
 };
 
-/*Unsafe!!*/
+// Non-atomic snapshot type. Access the packed shared state only through
+// AtomicReferenceNode; this structure itself provides no synchronization.
 template <typename _Ty> struct alignas(16) ReferenceNode {
   std::intptr_t
       thread_ref_counter; // how many threads are referencing this node?
@@ -49,12 +57,17 @@ template <typename _Ty> struct alignas(16) ReferenceNode {
 namespace concurrency {
 
 /*
- * [ 63 : PTR_BITS ] ！！ thread_ref_counter
- * [  PTR_BITS - 1 : 0 ] ！！ pointer
+ * [ word_bits - 1 : PTR_BITS ] external thread_ref_counter
+ * [       PTR_BITS - 1 : 0 ]   pointer
  */
+// This is 16-byte type alignment for the packed atomic; it is not cache-line
+// isolation between the queue's head and tail.
 template <typename _Ty> struct alignas(16) AtomicReferenceNode {
 
   using packed_t = std::uintptr_t;
+
+  static_assert(sizeof(packed_t) == 8,
+              "AtomicReferenceNode requires 64-bit uintptr_t");
 
   // Platform-specific detection
 #if defined(__x86_64__) || defined(_M_X64)
@@ -71,11 +84,8 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
   static constexpr int PTR_BITS = 48; // Default ARM64 Linux (e.g. Raspberry Pi)
 #endif
 
-#elif defined(__i386__) || defined(_M_IX86)
-  static constexpr int PTR_BITS = 32;
-
 #else
-#error "Unsupported or unknown architecture"
+#error "AtomicReferenceNode requires a 64-bit x86-64 or AArch64 target"
 #endif
 
   using reference_node = ReferenceNode<_Ty>;
@@ -84,6 +94,8 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
   static constexpr int REF_SHIFT = PTR_BITS;
 
   static packed_t pack(node_pointer node, std::intptr_t ref) {
+    // TODO(portability): verify that every supported pointer representation
+    // fits PTR_MASK; masking an out-of-range address would silently corrupt it.
     return (reinterpret_cast<packed_t>(node) & PTR_MASK) |
            (static_cast<packed_t>(ref) << REF_SHIFT);
   }
@@ -93,8 +105,8 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
   }
 
   static std::intptr_t extract_ref(packed_t val) {
-    // Sign-extension-safe if ref never goes negative (or if you want to allow
-    // negative ref)
+    // This field is a nonnegative external reference count and is deliberately
+    // zero-extended. It must not wrap past the bits available above PTR_BITS.
     return static_cast<std::intptr_t>(val >> REF_SHIFT);
   }
 
@@ -120,10 +132,12 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
     counter.fetch_sub(static_cast<packed_t>(1) << REF_SHIFT, order);
   }
 
-  // Compare-and-swap with structured reference_node
+  // Compare-and-swap with structured reference_node. The default acq_rel
+  // success order permits acquire on failure; performance-sensitive callers
+  // may still provide weaker valid orders when they do not consume a value.
   bool
   compare_exchange_weak(reference_node &expected, const reference_node &desired,
-                        std::memory_order success = std::memory_order_release,
+                        std::memory_order success = std::memory_order_acq_rel,
                         std::memory_order fail = std::memory_order_acquire) {
     packed_t expected_raw = pack(expected.node, expected.thread_ref_counter);
     packed_t desired_raw = pack(desired.node, desired.thread_ref_counter);
@@ -138,7 +152,7 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
   bool
   compare_exchange_strong(reference_node &expected,
                           const reference_node &desired,
-                          std::memory_order success = std::memory_order_release,
+                          std::memory_order success = std::memory_order_acq_rel,
                           std::memory_order fail = std::memory_order_acquire) {
     packed_t expected_raw = pack(expected.node, expected.thread_ref_counter);
     packed_t desired_raw = pack(desired.node, desired.thread_ref_counter);
