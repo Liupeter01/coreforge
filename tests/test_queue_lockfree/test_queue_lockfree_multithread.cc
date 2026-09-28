@@ -24,6 +24,13 @@ void run_concurrent_queue_test(const ConcurrencyTestParam &param) {
   std::atomic<std::size_t> total_popped{0};
   std::atomic<std::size_t> producers_done{0};
 
+  std::vector<std::atomic<std::uint8_t>> seen(param.total_values);
+  for (auto &slot : seen)
+    slot.store(0, std::memory_order_relaxed);
+
+  std::atomic<std::size_t> duplicate_count{0};
+  std::atomic<std::size_t> out_of_range_count{0};
+
   auto producer = [&](const std::size_t producer_index) {
     const std::size_t begin =
         param.total_values * producer_index / param.producer_count;
@@ -43,6 +50,13 @@ void run_concurrent_queue_test(const ConcurrencyTestParam &param) {
     for (;;) {
       if (auto value = queue.pop(); value.has_value()) {
         total_popped.fetch_add(1, std::memory_order_relaxed);
+
+        const std::size_t id = **value;
+        if (id >= param.total_values) {
+          out_of_range_count.fetch_add(1, std::memory_order_relaxed);
+        } else if (seen[id].exchange(1, std::memory_order_relaxed) != 0) {
+          duplicate_count.fetch_add(1, std::memory_order_relaxed);
+        }
         continue;
       }
 
@@ -78,6 +92,17 @@ void run_concurrent_queue_test(const ConcurrencyTestParam &param) {
   // useful follow-up test.
   EXPECT_EQ(total_popped.load(std::memory_order_relaxed), param.total_values);
   EXPECT_TRUE(queue.empty());
+
+  std::size_t missing_count = 0;
+  for (const auto &slot : seen) {
+    if (slot.load(std::memory_order_relaxed) == 0)
+      ++missing_count;
+  }
+
+  EXPECT_EQ(out_of_range_count.load(std::memory_order_relaxed), 0U);
+  EXPECT_EQ(duplicate_count.load(std::memory_order_relaxed), 0U);
+  EXPECT_EQ(missing_count, 0U);
+  EXPECT_EQ(total_popped.load(std::memory_order_relaxed), param.total_values);
 }
 
 TEST_P(LockFreeRefQueueConcurrentTest, PushAndPopAllValues) {
