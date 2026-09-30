@@ -12,23 +12,23 @@ if(PROJECT_BINARY_DIR EQUAL PROJECT_SOURCE_DIR)
 endif()
 
 project(
-  test_hpc_benchmark
+  hpc_benchmark
   VERSION 0.0.1
   LANGUAGES C CXX)
 
 file(GLOB TEST_SOURCES *.cc *.cpp)
 
-add_executable(test_hpc_benchmark ${TEST_SOURCES})
+add_executable(hpc_benchmark ${TEST_SOURCES})
 target_include_directories(
-  test_hpc_benchmark PUBLIC include ${LIBHPC_INCLUDE_DIRS}
+  hpc_benchmark PUBLIC include ${LIBHPC_INCLUDE_DIRS}
                             ${CMAKE_SOURCE_DIR}/external/sse2neon)
 target_link_libraries(
-  test_hpc_benchmark
+  hpc_benchmark
   PUBLIC ${OpenCV_LIBRARIES} benchmark::benchmark libmorton hpc_array
          sparse_data_structure libhpc_openmp)
 
 if(MSVC)
-    target_compile_options(  test_hpc_benchmark PRIVATE
+    target_compile_options(  hpc_benchmark PRIVATE
         /openmp:experimental
     )
 endif()
