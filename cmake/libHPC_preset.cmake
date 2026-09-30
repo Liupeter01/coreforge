@@ -12,17 +12,21 @@ include(FetchContent)
 include(CheckLanguage)
 
 set(LIBHPC_BUILD_TESTING_DEFAULT ON)
+set(LIBHPC_BUILD_BENCHMARK_DEFAULT ON)
 set(LIBHPC_ENABLE_TBB_DEFAULT ON)
 set(LIBHPC_ENABLE_CUDA_DEFAULT ON)
 
 if(APPLE)
   set(LIBHPC_BUILD_TESTING_DEFAULT OFF)
+  set(LIBHPC_BUILD_BENCHMARK_DEFAULT OFF)
   set(LIBHPC_ENABLE_TBB_DEFAULT OFF)
   set(LIBHPC_ENABLE_CUDA_DEFAULT OFF)
 endif()
 
-option(LIBHPC_BUILD_TESTING "Enable libHPC tests and benchmarks"
+option(LIBHPC_BUILD_TESTING "Enable libHPC tests"
        ${LIBHPC_BUILD_TESTING_DEFAULT})
+option(LIBHPC_BUILD_BENCHMARK "Enable libHPC benchmarks"
+       ${LIBHPC_BUILD_BENCHMARK_DEFAULT})
 option(LIBHPC_ENABLE_TBB "Enable the oneTBB backend"
        ${LIBHPC_ENABLE_TBB_DEFAULT})
 option(LIBHPC_ENABLE_CUDA "Enable CUDA modules when a compiler is available"
