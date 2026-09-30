@@ -48,8 +48,12 @@ template <typename _Ty> struct Node {
 // Non-atomic snapshot type. Access the packed shared state only through
 // AtomicReferenceNode; this structure itself provides no synchronization.
 template <typename _Ty> struct alignas(16) ReferenceNode {
-  std::intptr_t
-      thread_ref_counter; // how many threads are referencing this node?
+  // External protection count stored together with node in one atomic entry.
+  // While the entry still names this node, subtracting its baseline reference
+  // gives the number of successful protectors not yet settled (normally the
+  // active operations/threads holding this entry). It is only a momentary,
+  // per-entry count, not a global or stable queue-wide thread statistic.
+  std::intptr_t thread_ref_counter;
   Node<_Ty> *node;
 };
 } // namespace concurrency
@@ -67,21 +71,22 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
   using packed_t = std::uintptr_t;
 
   static_assert(sizeof(packed_t) == 8,
-              "AtomicReferenceNode requires 64-bit uintptr_t");
+                "AtomicReferenceNode requires 64-bit uintptr_t");
 
   // Platform-specific detection
 #if defined(__x86_64__) || defined(_M_X64)
   static constexpr int PTR_BITS =
-      48; // x86_64 canonical address (Linux, macOS, Windows)
+      48; // Project packing assumption; pack() must still validate the address.
 
 #elif defined(__aarch64__) || defined(_M_ARM64)
   static constexpr bool IS_64BIT = true;
 
 #if defined(__APPLE__)
   static constexpr int PTR_BITS =
-      47; // Apple M1/M2 uses 47-bit VAs with top byte ignored/PAC
+      47; // Project packing assumption for supported Apple arm64 processes.
 #else
-  static constexpr int PTR_BITS = 48; // Default ARM64 Linux (e.g. Raspberry Pi)
+  static constexpr int PTR_BITS =
+      48; // Project packing assumption for supported non-Apple arm64 targets.
 #endif
 
 #else
@@ -110,7 +115,9 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
     return static_cast<std::intptr_t>(val >> REF_SHIFT);
   }
 
-  // Atomic load into structured ReferenceNode
+  // Atomic load into a structured snapshot. Algorithmic callers use acquire
+  // only when the snapshot will publish or dereference a node; approximate
+  // observation may explicitly request relaxed ordering.
   reference_node
   load(std::memory_order order = std::memory_order_acquire) const {
     packed_t val = counter.load(order);
@@ -123,7 +130,10 @@ template <typename _Ty> struct alignas(16) AtomicReferenceNode {
     counter.store(pack(rn.node, rn.thread_ref_counter), order);
   }
 
-  // Helpers for direct reference counter manipulation
+  // Legacy low-level helpers. Queue operations use identity-aware CAS loops
+  // instead: an unconditional add/subtract cannot prove that the packed entry
+  // still names the node whose reference is being adjusted, and these helpers
+  // do not enforce the external-field capacity limit.
   void inc_ref(std::memory_order order = std::memory_order_acq_rel) {
     counter.fetch_add(static_cast<packed_t>(1) << REF_SHIFT, order);
   }

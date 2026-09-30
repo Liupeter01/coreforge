@@ -21,13 +21,19 @@ struct alignas(16) ref_counter_packed {
   static constexpr packed_t HEAD_TAIL_MASK = (1 << HEAD_TAIL_BITS) - 1;
   static constexpr int THREAD_REF_SHIFT = HEAD_TAIL_BITS;
 
+  // Diagnostic accessor used for approximate observation or after workers have
+  // joined. Relaxed is intentional: this value is not used to publish/consume
+  // node data, and acquire would not turn a live sample into a stable snapshot.
+  // The upper field is an unsigned modular encoding of a logical signed
+  // balance; this truncating conversion is only relied on for the final zero
+  // check, not for decoding an arbitrary in-flight negative balance.
   int get_threads_ref() const {
-    return static_cast<int>(counter.load(std::memory_order_acquire) >>
+    return static_cast<int>(counter.load(std::memory_order_relaxed) >>
                             THREAD_REF_SHIFT);
   }
 
   int get_head_tail_ref() const {
-    return static_cast<int>(counter.load(std::memory_order_acquire) &
+    return static_cast<int>(counter.load(std::memory_order_relaxed) &
                             HEAD_TAIL_MASK);
   }
 
@@ -72,6 +78,9 @@ struct alignas(16) ref_counter_packed {
     return (0 == new_val);
   }
 
+  // Legacy primitive retained for diagnostics/experimentation. Production
+  // reclamation uses sync_threads_ref(), whose CAS both removes the structural
+  // reference and uniquely reports whether the complete counter became zero.
   void dec_head_tail_ref() { counter.fetch_sub(1, std::memory_order_acq_rel); }
 
   bool sync_threads_ref(std::intptr_t any_other_threads) {
