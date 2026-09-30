@@ -29,17 +29,22 @@ public:
     m_head.store(init_node, std::memory_order_release);
     m_tail.store(init_node, std::memory_order_release);
   }
-  virtual ~ConcurrentQueue() { clear(); }
+  virtual ~ConcurrentQueue() {
+    // Public clear() deliberately preserves the final dummy so the queue can
+    // be reused. Once no concurrent users may remain, destruction reclaims
+    // that dummy exactly once.
+    clear();
+    delete m_tail.load().node;
+  }
 
 public:
-  // TODO(correctness): this currently deletes the final dummy without
-  // resetting m_head/m_tail. An explicit clear(), a later reuse, or the
-  // destructor's second clear() therefore dereferences dangling state. Public
-  // clear should only drain; destruction should reclaim the final dummy once.
+  // Drain all values but keep the final dummy alive and referenced by both
+  // m_head and m_tail. This makes explicit clear(), repeated clear(), and
+  // clear-then-reuse valid. Like destruction, clear() requires exclusive
+  // lifecycle access; it is not a concurrent operation on the queue.
   void clear() {
     while (pop().has_value())
       ;
-    delete m_tail.load().node;
   }
 
   const bool empty() const {
@@ -106,7 +111,9 @@ protected:
           new_next = old_next;
         }
 
-        value.release(); // release resource
+        // data now owns the object; relinquish unique_ptr ownership without
+        // destroying the published value.
+        value.release();
 
         update_new_tail(old_tail, new_next);
         ++m_size;
@@ -144,7 +151,7 @@ protected:
       }
 
       if (old_head.node == m_tail.load(std::memory_order_acquire).node) {
-        __release_curr_thread_ref(old_head);
+        rollback_or_release_head_ref(m_head, old_head);
         return std::nullopt;
       }
 
@@ -186,6 +193,40 @@ protected:
 private:
   static void *consumed_ptr() noexcept { return &consumed_tag; }
 
+  // An empty pop has already added one external reference to protected_head.
+  // While head still names that node, cancel the reference directly in the
+  // packed external counter. A same-node CAS failure only means another thread
+  // changed the aggregate count, so retry from the refreshed snapshot. If head
+  // has moved, its winner's snapshot contains this unreverted reference; repay
+  // it once through the original node's internal counter instead.
+  static void
+  rollback_or_release_head_ref(AtomicReferenceNode<_Ty> &head,
+                               ReferenceNode<_Ty> protected_head) noexcept {
+    // CAS failure overwrites current, so preserve the node actually protected
+    // by this pop before entering the retry loop.
+    Node<_Ty> *const ptr = protected_head.node;
+    auto current = protected_head;
+
+    for (;;) {
+      if (current.node != ptr) {
+        ptr->release_curr_thread_ref();
+        return;
+      }
+
+      if (current.thread_ref_counter <= 1)
+        std::terminate();
+
+      auto desired = current;
+      --desired.thread_ref_counter;
+
+      if (head.compare_exchange_weak(current, desired,
+                                     std::memory_order_relaxed,
+                                     std::memory_order_relaxed)) {
+        return;
+      }
+    }
+  }
+
   void update_new_tail(ReferenceNode<_Ty> &old_tail,
                        const ReferenceNode<_Ty> &new_tail) {
     Node<_Ty> *backup = old_tail.node;
@@ -214,9 +255,12 @@ private:
     ReferenceNode<_Ty> new_ref;
     do {
       new_ref = old;
-      // TODO(correctness): this packed field is bounded (17 bits with the
-      // current Apple layout, 16 on x86-64). Repeated empty pops keep raising
-      // the same head's external count, so silent wrap must be prevented.
+      // This packed field is bounded (17 bits with the current Apple layout,
+      // 16 on x86-64). The empty-pop path now rolls its increment back while
+      // head still names the same node, so sequential empty polling no longer
+      // accumulates historical references. A capacity guard is still required:
+      // enough simultaneously in-flight protectors could otherwise wrap the
+      // field before any of them has a chance to release or roll back.
       new_ref.thread_ref_counter += 1;
     } while (!main_node.compare_exchange_weak(
         old, new_ref, std::memory_order_acq_rel, std::memory_order_relaxed));
