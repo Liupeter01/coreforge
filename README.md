@@ -38,9 +38,7 @@ test-framework downloads. They can be requested explicitly with
 
 ## 0x03 Debug Sanitizer Builds
 
-Coreforge supports separate Debug build directories for AddressSanitizer and
-ThreadSanitizer on Linux and macOS. ASan and TSan cannot be combined, so use a
-different build directory for each one.
+Coreforge supports separate Debug build directories for AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer on Linux and macOS. ASan, UBSan and TSan cannot be combined, so use a different build directory for each one.
 
 `LIBHPC_SANITIZER` accepts the following values:
 
@@ -48,11 +46,10 @@ different build directory for each one.
 |-------|-----------------------|
 | `address` | AddressSanitizer (`address,leak` on Linux; `address` on macOS) |
 | `thread` | ThreadSanitizer |
+| `undefined` | UndefinedBehaviorSanitizer |
 | `none` | No sanitizer |
 
-Sanitizer flags are applied only to the Debug configuration. Release,
-RelWithDebInfo, and MinSizeRel builds remain uninstrumented so that benchmark
-timings are not distorted.
+Sanitizer flags are applied only to the Debug configuration. Release, RelWithDebInfo, and MinSizeRel builds remain uninstrumented so that benchmark timings are not distorted.
 
 Configure, build, and run the ASan tests:
 
@@ -74,6 +71,17 @@ cmake -S . -B build-tsan \
   -DLIBHPC_SANITIZER=thread
 cmake --build build-tsan -j
 ctest --test-dir build-tsan --output-on-failure
+```
+
+Configure, build, and run the UBSan tests:
+
+```bash
+cmake -S . -B build-ubsan \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DLIBHPC_BUILD_TESTING=ON \
+  -DLIBHPC_SANITIZER=undefined
+cmake --build build-ubsan -j
+ctest --test-dir build-ubsan --output-on-failure
 ```
 
 For a Debug build without instrumentation, use
