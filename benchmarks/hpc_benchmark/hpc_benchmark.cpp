@@ -13,11 +13,11 @@
 #include <type_traits>
 #include <vector>
 
-#ifndef LIBHPC_USE_OPENMP
-#define LIBHPC_USE_OPENMP 0
+#ifndef COREFORGE_USE_OPENMP
+#define COREFORGE_USE_OPENMP 0
 #endif
 
-#if LIBHPC_USE_OPENMP
+#if COREFORGE_USE_OPENMP
 #include <omp.h>
 #else
 inline int omp_get_max_threads() noexcept { return 1; }
@@ -25,11 +25,11 @@ inline int omp_get_thread_num() noexcept { return 0; }
 inline void omp_set_num_threads(int) noexcept {}
 #endif
 
-#ifndef LIBHPC_USE_TBB
-#define LIBHPC_USE_TBB 0
+#ifndef COREFORGE_USE_TBB
+#define COREFORGE_USE_TBB 0
 #endif
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 #include <tbb/blocked_range2d.h>
 #include <tbb/parallel_for.h>
 #include <tbb/spin_mutex.h>
@@ -140,7 +140,7 @@ static void BM_fill_zero_parallel_omp(benchmark::State &bm) {
   }
 }
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 static void BM_fill_zero_parallel_tbb(benchmark::State &bm) {
   constexpr long long n = 1 << 27;
   std::vector<float> arr(n);
@@ -188,7 +188,7 @@ static void BM_sin_parallel_omp(benchmark::State &bm) {
   }
 }
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 static void BM_sin_parallel_tbb(benchmark::State &bm) {
   constexpr std::size_t n = 1 << 27;
   std::vector<float> arr(n);
@@ -1391,7 +1391,7 @@ static void BM_transpose_tiling_morton2d_stream(benchmark::State &bm) {
   }
 }
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 static void BM_transpose_tiling_tbb(benchmark::State &bm) {
   for (auto _ : bm) {
     tbb::parallel_for(
@@ -1726,7 +1726,7 @@ static void BM_fixedpoint_uint8(benchmark::State &bm) {
 static constexpr std::size_t max_n = 1 << 24;
 std::atomic_bool flag;
 std::mutex mutex;
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 using BenchmarkSpinMutex = tbb::spin_mutex;
 #else
 using BenchmarkSpinMutex = std::mutex;
@@ -2163,14 +2163,14 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
 BENCHMARK(BM_fill_zero_serial);
 BENCHMARK(BM_fill_zero_parallel_omp);
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 BENCHMARK(BM_fill_zero_parallel_tbb);
 #endif
 
 BENCHMARK(BM_sin_serial);
 BENCHMARK(BM_sin_parallel_omp);
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 BENCHMARK(BM_sin_parallel_tbb);
 #endif
 
@@ -2262,7 +2262,7 @@ BENCHMARK(BM_transpose);
 BENCHMARK(BM_transpose_tiling);
 BENCHMARK(BM_transpose_tiling_morton2d);
 BENCHMARK(BM_transpose_tiling_morton2d_stream);
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 BENCHMARK(BM_transpose_tiling_tbb);
 #endif
 

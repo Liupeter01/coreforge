@@ -20,12 +20,12 @@ file(GLOB TEST_SOURCES *.cc *.cpp)
 
 add_executable(hpc_benchmark ${TEST_SOURCES})
 target_include_directories(
-  hpc_benchmark PUBLIC include ${LIBHPC_INCLUDE_DIRS}
+  hpc_benchmark PUBLIC include ${COREFORGE_INCLUDE_DIRS}
                             ${CMAKE_SOURCE_DIR}/external/sse2neon)
 target_link_libraries(
   hpc_benchmark
   PUBLIC ${OpenCV_LIBRARIES} benchmark::benchmark libmorton hpc_array
-         sparse_data_structure libhpc_openmp)
+         sparse_data_structure coreforge_openmp)
 
 if(MSVC)
     target_compile_options(  hpc_benchmark PRIVATE

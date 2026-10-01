@@ -1,10 +1,10 @@
 #pragma once
 
-#ifndef LIBHPC_USE_TBB
-#define LIBHPC_USE_TBB 0
+#ifndef COREFORGE_USE_TBB
+#define COREFORGE_USE_TBB 0
 #endif
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 
 #include <tbb/concurrent_vector.h>
 #include <tbb/parallel_for.h>
@@ -21,7 +21,7 @@
 
 namespace sparse::details {
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 
 template <typename T> using ConcurrentSequence = tbb::concurrent_vector<T>;
 

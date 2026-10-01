@@ -4,7 +4,7 @@ project(test_queue_lockfree LANGUAGES CXX C)
 
 include(GoogleTest)
 
-if(NOT LIBHPC_BUILD_TESTING)
+if(NOT COREFORGE_BUILD_TESTING)
   return()
 endif()
 

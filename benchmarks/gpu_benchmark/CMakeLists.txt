@@ -22,7 +22,7 @@ file(GLOB TEST_SOURCES *.cc *.cpp)
 
 add_executable(gpu_benchmark ${TEST_SOURCES})
 target_include_directories(
-  gpu_benchmark PUBLIC include ${LIBHPC_INCLUDE_DIRS}
+  gpu_benchmark PUBLIC include ${COREFORGE_INCLUDE_DIRS}
                             ${CMAKE_CURRENT_SOURCE_DIR}/external/sse2neon)
 
 target_link_libraries(
