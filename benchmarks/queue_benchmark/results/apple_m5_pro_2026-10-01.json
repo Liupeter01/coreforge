@@ -1,0 +1,66 @@
+{
+  "schema": "coreforge.queue_latency.v1",
+  "date": "2026-10-01",
+  "environment": {
+    "machine": "MacBook Pro Mac17,9",
+    "processor": "Apple M5 Pro",
+    "cpu_cores": 15,
+    "memory_gib": 24,
+    "build_type": "Release",
+    "thread_affinity": "unpinned",
+    "clock": "std::chrono::steady_clock"
+  },
+  "method": {
+    "total_handoffs_per_run": 100000000,
+    "warmup_handoffs": 100000,
+    "sample_stride": 100,
+    "latency_samples": 999000,
+    "percentile": "nearest-rank after sorting sampled per-element latencies",
+    "mpmc_offered_load_handoffs_per_second": 1000000,
+    "mpmc_producers": 4,
+    "mpmc_consumers": 4
+  },
+  "benchmarks": [
+    {
+      "workload": "SPSC one element in flight",
+      "queue": "bounded circular",
+      "observed_handoffs_per_second": 4153839.9838536615,
+      "p50_ns": 167,
+      "p90_ns": 208,
+      "p99_ns": 209,
+      "p999_ns": 375,
+      "max_ns": 43958
+    },
+    {
+      "workload": "SPSC one element in flight",
+      "queue": "reference-counted linked",
+      "observed_handoffs_per_second": 1514914.8087715611,
+      "p50_ns": 542,
+      "p90_ns": 584,
+      "p99_ns": 709,
+      "p999_ns": 1000,
+      "max_ns": 78459
+    },
+    {
+      "workload": "4P4C open-loop at 1M handoffs/s",
+      "queue": "bounded circular",
+      "observed_handoffs_per_second": 999989.992600149,
+      "p50_ns": 500,
+      "p90_ns": 542,
+      "p99_ns": 667,
+      "p999_ns": 64834,
+      "max_ns": 4385792
+    },
+    {
+      "workload": "4P4C open-loop at 1M handoffs/s",
+      "queue": "reference-counted linked",
+      "observed_handoffs_per_second": 999989.9609307839,
+      "p50_ns": 1667,
+      "p90_ns": 2417,
+      "p99_ns": 3625,
+      "p999_ns": 439500,
+      "max_ns": 5560042
+    }
+  ]
+}
+
