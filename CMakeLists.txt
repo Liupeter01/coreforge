@@ -42,7 +42,11 @@ endif()
 
 if(LIBHPC_BUILD_TESTING)
   enable_testing()
-  add_subdirectory(external/benchmark)
   add_subdirectory(external/libmorton)
   add_subdirectory(tests)
+endif()
+
+if(LIBHPC_BUILD_BENCHMARK)
+  add_subdirectory(external/benchmark)
+  add_subdirectory(benchmarks)
 endif()

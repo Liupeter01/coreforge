@@ -32,7 +32,8 @@ test-framework downloads. They can be requested explicitly with
 
 - `LIBHPC_ENABLE_TBB`: enabled by default on non-Apple platforms.
 - `LIBHPC_ENABLE_CUDA`: probes CUDA on non-Apple platforms when enabled.
-- `LIBHPC_BUILD_TESTING`: builds tests and benchmarks; defaults to off on Apple.
+- `LIBHPC_BUILD_TESTING`: builds tests; defaults to off on Apple.
+- `LIBHPC_BUILD_BENCHMARK`: builds benchmarks; defaults to off on Apple.
 
 ---
 

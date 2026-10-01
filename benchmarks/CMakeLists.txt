@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(LIBHPC_test LANGUAGES CXX C)
+project(LIBHPC_benchmark LANGUAGES CXX C)
 
 include(FetchContent)
 
@@ -65,32 +65,9 @@ set(gtest_force_shared_crt
 
 FetchContent_MakeAvailable(googletest)
 
-# Universal Package
-add_subdirectory(test_hpc_array)
-add_subdirectory(test_sparse)
-add_subdirectory(test_radixsort_cpu)
-
 if(LIBHPC_HAS_CUDA)
-  add_subdirectory(test_stall_lg_testsuite)
-  add_subdirectory(test_overlap_pipeline_sweep_testsuite)
-  add_subdirectory(test_compute_intensity_latency_sweep)
-  add_subdirectory(test_mio_throttle_testsuite)
-  add_subdirectory(test_stall_short_testsuite)
-  add_subdirectory(test_radixsort_gpu)
-  add_subdirectory(test_radixsort_gpu_global_offset)
-  add_subdirectory(test_radixsort_gpu_local_count)
-  add_subdirectory(test_radixsort_gpu_local_offset)
-  add_subdirectory(test_sm80_cp_async)
+  add_subdirectory(gpu_benchmark)
 endif()
 
-# Only enable in debug mode!
-if(LIBHPC_BUILD_TESTING)
-  add_subdirectory(test_hierarchical_lock)
-  add_subdirectory(test_threadpool_ref)
-  add_subdirectory(test_circular_queue_lk)
-  add_subdirectory(test_circular_queue_lockfree)
-  add_subdirectory(test_linklist_lk)
-  add_subdirectory(test_stack_lockfree)
-  add_subdirectory(test_queue_lockfree)
-  add_subdirectory(test_single_mempool)
-endif()
+add_subdirectory(hpc_benchmark)
+add_subdirectory(queue_benchmark)
