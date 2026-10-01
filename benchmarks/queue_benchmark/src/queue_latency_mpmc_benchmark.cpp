@@ -1,9 +1,9 @@
 #include <benchmark/benchmark.h>
 
-#include "lib/circular_handoff_queue.hpp"
-#include "lib/exponential_backoff.hpp"
-#include "lib/linked_handoff_queue.hpp"
-#include "lib/queue_latency_common.hpp"
+#include "circular_handoff_queue.hpp"
+#include "exponential_backoff.hpp"
+#include "linked_handoff_queue.hpp"
+#include "queue_latency_common.hpp"
 
 #include <array>
 #include <atomic>
