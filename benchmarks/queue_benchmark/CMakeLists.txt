@@ -20,8 +20,8 @@ file(GLOB TEST_SOURCES *.cc *.cpp)
 
 add_executable(queue_benchmark ${TEST_SOURCES})
 target_include_directories(
-  queue_benchmark PUBLIC include ${LIBHPC_INCLUDE_DIRS}
-                            ${CMAKE_SOURCE_DIR}/external/sse2neon)
+  queue_benchmark PUBLIC include lib ${LIBHPC_INCLUDE_DIRS}
+                         ${CMAKE_SOURCE_DIR}/external/sse2neon)
 target_link_libraries(
   queue_benchmark
   PUBLIC ${OpenCV_LIBRARIES} benchmark::benchmark circular_queue queue)
