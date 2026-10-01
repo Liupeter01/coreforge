@@ -16,11 +16,12 @@ project(
   VERSION 0.0.1
   LANGUAGES C CXX)
 
-file(GLOB TEST_SOURCES *.cc *.cpp)
+file(GLOB_RECURSE source_file CONFIGURE_DEPENDS src/*.cpp src/*.cc src/*.c)
+file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
-add_executable(queue_benchmark ${TEST_SOURCES})
+add_executable(queue_benchmark ${source_file} ${header_file})
 target_include_directories(
-  queue_benchmark PUBLIC include lib ${LIBHPC_INCLUDE_DIRS}
+  queue_benchmark PUBLIC include include ${LIBHPC_INCLUDE_DIRS}
                          ${CMAKE_SOURCE_DIR}/external/sse2neon)
 target_link_libraries(
   queue_benchmark
