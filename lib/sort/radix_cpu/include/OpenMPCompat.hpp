@@ -1,10 +1,10 @@
 #pragma once
 
-#ifndef LIBHPC_USE_OPENMP
-#define LIBHPC_USE_OPENMP 0
+#ifndef COREFORGE_USE_OPENMP
+#define COREFORGE_USE_OPENMP 0
 #endif
 
-#if LIBHPC_USE_OPENMP
+#if COREFORGE_USE_OPENMP
 #include <omp.h>
 #else
 inline int omp_get_max_threads() noexcept { return 1; }

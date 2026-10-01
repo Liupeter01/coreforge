@@ -151,8 +151,10 @@ static void BM_CircularQueue_MPMC(benchmark::State &state) {
 
     benchmark::DoNotOptimize(checksum);
 
-    if (total_consumed != N)
-      state.SkipWithError("consumer count mismatch");
+    const std::uint64_t expected_checksum =
+        static_cast<std::uint64_t>(N) * (N - 1) / 2;
+    if (total_consumed != N || checksum != expected_checksum)
+      state.SkipWithError("consumer count or checksum mismatch");
   }
 
   state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * N));
@@ -262,8 +264,10 @@ static void BM_LinkListQueue_MPMC(benchmark::State &state) {
 
     benchmark::DoNotOptimize(checksum);
 
-    if (total_consumed != N)
-      state.SkipWithError("consumer count mismatch");
+    const std::uint64_t expected_checksum =
+        static_cast<std::uint64_t>(N) * (N - 1) / 2;
+    if (total_consumed != N || checksum != expected_checksum)
+      state.SkipWithError("consumer count or checksum mismatch");
   }
 
   state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * N));
@@ -373,8 +377,10 @@ static void BM_MutexQueue_MPMC(benchmark::State &state) {
 
     benchmark::DoNotOptimize(checksum);
 
-    if (total_consumed != N)
-      state.SkipWithError("consumer count mismatch");
+    const std::uint64_t expected_checksum =
+        static_cast<std::uint64_t>(N) * (N - 1) / 2;
+    if (total_consumed != N || checksum != expected_checksum)
+      state.SkipWithError("consumer count or checksum mismatch");
   }
 
   state.SetItemsProcessed(static_cast<std::int64_t>(state.iterations() * N));

@@ -24,16 +24,16 @@ from Apple targets, even if a stale CMake cache attempts to enable them.
 
 Tests and benchmarks default to off on Apple to keep the base CPU build free of
 test-framework downloads. They can be requested explicitly with
-`-DLIBHPC_BUILD_TESTING=ON`.
+`-DCOREFORGE_BUILD_TESTING=ON`.
 
 ---
 
 ## 0x02 Optional Backends
 
-- `LIBHPC_ENABLE_TBB`: enabled by default on non-Apple platforms.
-- `LIBHPC_ENABLE_CUDA`: probes CUDA on non-Apple platforms when enabled.
-- `LIBHPC_BUILD_TESTING`: builds tests; defaults to off on Apple.
-- `LIBHPC_BUILD_BENCHMARK`: builds benchmarks; defaults to off on Apple.
+- `COREFORGE_ENABLE_TBB`: enabled by default on non-Apple platforms.
+- `COREFORGE_ENABLE_CUDA`: probes CUDA on non-Apple platforms when enabled.
+- `COREFORGE_BUILD_TESTING`: builds tests; defaults to off on Apple.
+- `COREFORGE_BUILD_BENCHMARK`: builds benchmarks; defaults to off on Apple.
 
 ---
 
@@ -41,7 +41,7 @@ test-framework downloads. They can be requested explicitly with
 
 Coreforge supports separate Debug build directories for AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer on Linux and macOS. ASan, UBSan and TSan cannot be combined, so use a different build directory for each one.
 
-`LIBHPC_SANITIZER` accepts the following values:
+`COREFORGE_SANITIZER` accepts the following values:
 
 | Value | Debug instrumentation |
 |-------|-----------------------|
@@ -57,8 +57,8 @@ Configure, build, and run the ASan tests:
 ```sh
 cmake -S . -B build-asan \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DLIBHPC_BUILD_TESTING=ON \
-  -DLIBHPC_SANITIZER=address
+  -DCOREFORGE_BUILD_TESTING=ON \
+  -DCOREFORGE_SANITIZER=address
 cmake --build build-asan -j
 ctest --test-dir build-asan --output-on-failure
 ```
@@ -68,8 +68,8 @@ Configure, build, and run the TSan tests:
 ```sh
 cmake -S . -B build-tsan \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DLIBHPC_BUILD_TESTING=ON \
-  -DLIBHPC_SANITIZER=thread
+  -DCOREFORGE_BUILD_TESTING=ON \
+  -DCOREFORGE_SANITIZER=thread
 cmake --build build-tsan -j
 ctest --test-dir build-tsan --output-on-failure
 ```
@@ -79,20 +79,20 @@ Configure, build, and run the UBSan tests:
 ```bash
 cmake -S . -B build-ubsan \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DLIBHPC_BUILD_TESTING=ON \
-  -DLIBHPC_SANITIZER=undefined
+  -DCOREFORGE_BUILD_TESTING=ON \
+  -DCOREFORGE_SANITIZER=undefined
 cmake --build build-ubsan -j
 ctest --test-dir build-ubsan --output-on-failure
 ```
 
 For a Debug build without instrumentation, use
-`-DLIBHPC_SANITIZER=none`. Sanitizer selection is not currently configured for
+`-DCOREFORGE_SANITIZER=none`. Sanitizer selection is not currently configured for
 Windows builds.
 
 ---
 
 ## 0x04 GPU Performance Optimization Highlights
-libHPC includes GPU-accelerated kernels optimized for high-throughput computation on NVIDIA CUDA-compatible devices:
+CoreForge includes GPU-accelerated kernels optimized for high-throughput computation on NVIDIA CUDA-compatible devices:
 - **Radix-Sort Kernel:** Processes 500M elements in ~360ms on an RTX 3080 Ti(laptop), sustaining ~1.39B elements/sec throughput.  
 - **Warp-Synchronous & Tiled Memory Layouts:** Maximizes shared memory utilization and minimizes global memory latency.  
 - **Concurrent GPU Pipelines:** Supports asynchronous kernel launches and stream-based scheduling for overlapping compute and memory operations.  

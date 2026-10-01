@@ -15,6 +15,6 @@ project(
 
 add_library(sparse_data_structure STATIC ${source_file} ${header_file})
 target_include_directories(sparse_data_structure PUBLIC include)
-target_link_libraries(sparse_data_structure PUBLIC libhpc_tbb libhpc_openmp)
+target_link_libraries(sparse_data_structure PUBLIC coreforge_tbb coreforge_openmp)
 set_property(TARGET sparse_data_structure PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_target_properties(sparse_data_structure PROPERTIES LINKER_LANGUAGE CXX)

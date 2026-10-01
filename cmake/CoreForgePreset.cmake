@@ -1,5 +1,5 @@
 # ============================================
-# libHPC Build Preset Cross-platform TBB, LLVM, CUDA, ccache guard
+# CoreForge build preset: cross-platform TBB, LLVM, CUDA, and ccache guards
 # ============================================
 
 cmake_minimum_required(VERSION 3.15)
@@ -11,26 +11,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 include(CheckLanguage)
 
-set(LIBHPC_BUILD_TESTING_DEFAULT ON)
-set(LIBHPC_BUILD_BENCHMARK_DEFAULT ON)
-set(LIBHPC_ENABLE_TBB_DEFAULT ON)
-set(LIBHPC_ENABLE_CUDA_DEFAULT ON)
+set(COREFORGE_BUILD_TESTING_DEFAULT ON)
+set(COREFORGE_BUILD_BENCHMARK_DEFAULT ON)
+set(COREFORGE_ENABLE_TBB_DEFAULT ON)
+set(COREFORGE_ENABLE_CUDA_DEFAULT ON)
 
 if(APPLE)
-  set(LIBHPC_BUILD_TESTING_DEFAULT OFF)
-  set(LIBHPC_BUILD_BENCHMARK_DEFAULT OFF)
-  set(LIBHPC_ENABLE_TBB_DEFAULT OFF)
-  set(LIBHPC_ENABLE_CUDA_DEFAULT OFF)
+  set(COREFORGE_BUILD_TESTING_DEFAULT OFF)
+  set(COREFORGE_BUILD_BENCHMARK_DEFAULT OFF)
+  set(COREFORGE_ENABLE_TBB_DEFAULT OFF)
+  set(COREFORGE_ENABLE_CUDA_DEFAULT OFF)
 endif()
 
-option(LIBHPC_BUILD_TESTING "Enable libHPC tests"
-       ${LIBHPC_BUILD_TESTING_DEFAULT})
-option(LIBHPC_BUILD_BENCHMARK "Enable libHPC benchmarks"
-       ${LIBHPC_BUILD_BENCHMARK_DEFAULT})
-option(LIBHPC_ENABLE_TBB "Enable the oneTBB backend"
-       ${LIBHPC_ENABLE_TBB_DEFAULT})
-option(LIBHPC_ENABLE_CUDA "Enable CUDA modules when a compiler is available"
-       ${LIBHPC_ENABLE_CUDA_DEFAULT})
+option(COREFORGE_BUILD_TESTING "Enable CoreForge tests"
+       ${COREFORGE_BUILD_TESTING_DEFAULT})
+option(COREFORGE_BUILD_BENCHMARK "Enable CoreForge benchmarks"
+       ${COREFORGE_BUILD_BENCHMARK_DEFAULT})
+option(COREFORGE_ENABLE_TBB "Enable the oneTBB backend"
+       ${COREFORGE_ENABLE_TBB_DEFAULT})
+option(COREFORGE_ENABLE_CUDA "Enable CUDA modules when a compiler is available"
+       ${COREFORGE_ENABLE_CUDA_DEFAULT})
 
 # --------------------------------------------
 # Common
@@ -56,18 +56,18 @@ if(WIN32)
   add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
 elseif(APPLE)
   string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR};${CMAKE_OSX_ARCHITECTURES}"
-         LIBHPC_TARGET_ARCHITECTURES)
-  if(LIBHPC_TARGET_ARCHITECTURES MATCHES "arm64|aarch64")
-    set(LIBHPC_APPLE_SILICON ON)
+         COREFORGE_TARGET_ARCHITECTURES)
+  if(COREFORGE_TARGET_ARCHITECTURES MATCHES "arm64|aarch64")
+    set(COREFORGE_APPLE_SILICON ON)
   else()
-    set(LIBHPC_APPLE_SILICON OFF)
+    set(COREFORGE_APPLE_SILICON OFF)
   endif()
 
-  if(LIBHPC_ENABLE_TBB OR LIBHPC_ENABLE_CUDA)
+  if(COREFORGE_ENABLE_TBB OR COREFORGE_ENABLE_CUDA)
     message(STATUS "Apple platform detected: disabling oneTBB and CUDA")
   endif()
-  set(LIBHPC_ENABLE_TBB OFF CACHE BOOL "Enable the oneTBB backend" FORCE)
-  set(LIBHPC_ENABLE_CUDA OFF CACHE BOOL
+  set(COREFORGE_ENABLE_TBB OFF CACHE BOOL "Enable the oneTBB backend" FORCE)
+  set(COREFORGE_ENABLE_CUDA OFF CACHE BOOL
       "Enable CUDA modules when a compiler is available" FORCE)
 endif()
 
@@ -106,7 +106,7 @@ set(TBB_BENCHMARK
 # --------------------------------------------
 # oneTBB Split mode
 # --------------------------------------------
-if(LIBHPC_ENABLE_TBB)
+if(COREFORGE_ENABLE_TBB)
   FetchContent_Declare(
     TBB
     GIT_REPOSITORY https://github.com/uxlfoundation/oneTBB
@@ -119,12 +119,12 @@ endif()
 # --------------------------------------------
 # CUDA
 # --------------------------------------------
-set(LIBHPC_HAS_CUDA OFF)
-if(LIBHPC_ENABLE_CUDA)
+set(COREFORGE_HAS_CUDA OFF)
+if(COREFORGE_ENABLE_CUDA)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
-    set(LIBHPC_HAS_CUDA ON)
+    set(COREFORGE_HAS_CUDA ON)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
