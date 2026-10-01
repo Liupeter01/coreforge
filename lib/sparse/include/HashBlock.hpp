@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
 #include <tbb/concurrent_hash_map.h>
 #endif
 
@@ -50,7 +50,7 @@ struct HashBlock
   using const_value = const OtherBlock;
   using CurrBlockType = BlockInfo<1, false, OtherBlock>;
 
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
   using ContainerType =
       tbb::concurrent_hash_map<details::Coord2D, std::unique_ptr<OtherBlock>,
                                details::Coord2D_HashCompare>;
@@ -70,7 +70,7 @@ struct HashBlock
   virtual std::optional<std::reference_wrapper<value_type>>
   operator()(const std::intptr_t x, const std::intptr_t y) override {
     auto key = getKey(x, y);
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
     ContainerAccessor accessor;
     if (!m_data.find(accessor, key)) {
       return std::nullopt;
@@ -89,7 +89,7 @@ struct HashBlock
   virtual std::optional<std::reference_wrapper<const_value>>
   operator()(const std::intptr_t x, const std::intptr_t y) const override {
     auto key = getKey(x, y);
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
     ConstContainerAccessor accessor;
     if (!m_data.find(accessor, key)) {
       return std::nullopt;
@@ -127,7 +127,7 @@ struct HashBlock
   virtual std::reference_wrapper<value_type>
   touch_pointer(const std::intptr_t x, const std::intptr_t y) override {
     auto key = getKey(x, y);
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
     ContainerAccessor accessor;
     m_data.insert(accessor, key);
 
@@ -146,7 +146,7 @@ struct HashBlock
   }
 
   template <typename Func> void foreach (Func &&func) {
-#if LIBHPC_USE_TBB
+#if COREFORGE_USE_TBB
     std::vector<details::Coord2D> keys;
     keys.reserve(m_data.size());
 
@@ -177,7 +177,7 @@ struct HashBlock
 
   ContainerType m_data;
 
-#if !LIBHPC_USE_TBB
+#if !COREFORGE_USE_TBB
   mutable std::shared_mutex m_mutex;
 #endif
 

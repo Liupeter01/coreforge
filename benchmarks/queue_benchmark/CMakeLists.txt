@@ -21,8 +21,8 @@ file(GLOB_RECURSE header_file CONFIGURE_DEPENDS include/*.hpp include/*.h)
 
 add_executable(queue_benchmark ${source_file} ${header_file})
 target_include_directories(
-  queue_benchmark PUBLIC include include ${LIBHPC_INCLUDE_DIRS}
-                         ${CMAKE_SOURCE_DIR}/external/sse2neon)
+  queue_benchmark PUBLIC include ${COREFORGE_INCLUDE_DIRS}
+                            ${CMAKE_SOURCE_DIR}/external/sse2neon)
 target_link_libraries(
   queue_benchmark
   PUBLIC ${OpenCV_LIBRARIES} benchmark::benchmark circular_queue queue)
