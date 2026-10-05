@@ -1,3 +1,4 @@
+#include <array>
 #include <benchmark/benchmark.h>
 #include <circular_queue_lockfree.hpp>
 #include <queue_lk.hpp>
