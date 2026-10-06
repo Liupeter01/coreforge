@@ -2,6 +2,7 @@
 #ifndef _HIERARCHICAL_LOCK_HPP_
 #define _HIERARCHICAL_LOCK_HPP_
 #include <mutex>
+#include <stdexcept>
 
 struct hierarchical_lock {
   explicit hierarchical_lock(std::size_t init_value)

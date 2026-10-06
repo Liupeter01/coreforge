@@ -17,6 +17,7 @@
 #define _DS_H_
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 typedef void (*ngx_pool_cleanup_pt)(void *data);
 

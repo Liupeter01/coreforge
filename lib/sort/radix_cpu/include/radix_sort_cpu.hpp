@@ -5,6 +5,9 @@
 #include <memory>
 #include <numeric>
 #include <vector>
+#include <cstring>
+#include <cstdint>
+#include <limits>
 
 namespace sort {
 namespace radix {
@@ -270,8 +273,8 @@ static void radix_sort_cache_thread_v2(std::uint32_t *a, std::size_t n) {
 
   for (std::size_t round = 0; round < ROUND; ++round) {
     const std::size_t new_shift = RSHIFT * round;
-    memset(base, 0, sizeof(uint32_t) * BinSize);
-    memset(local.data(), 0, sizeof(uint32_t) * (BinSize * nproc));
+    std::memset(base, 0, sizeof(uint32_t) * BinSize);
+    std::memset(local.data(), 0, sizeof(uint32_t) * (BinSize * nproc));
 
 #pragma omp parallel for schedule(static, 1)
     for (long long thread_id = 0; thread_id < nproc; ++thread_id) {
