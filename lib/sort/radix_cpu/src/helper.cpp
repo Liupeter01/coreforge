@@ -1,5 +1,6 @@
 #include <radix_sort_cpu.hpp>
 #include <random>
+#include <algorithm>
 
 void sort::radix::details::helper::write_back(
     std::uint32_t *a, const std::vector<std::vector<uint32_t>> &bin,
