@@ -62,7 +62,7 @@ void *safe_aligned_alloc(size_t alignment, size_t size) {
 #if defined(_MSC_VER)
   return _aligned_malloc(size, alignment);
 #elif defined(__APPLE__) || defined(__linux__)
-  // macOS posix_memalign£»Linux aligned_alloc
+  // macOS posix_memalignï¿½ï¿½Linux aligned_alloc
   void *ptr = nullptr;
   return posix_memalign(&ptr, alignment, size) == 0 ? ptr : nullptr;
 #else
@@ -622,7 +622,7 @@ static void BM_rand_blk_64_seq_base_aligned_prefetch(benchmark::State &bm) {
 
 static void BM_rand_blk_4096_seq_base_not_aligned(benchmark::State &bm) {
   constexpr long long block_bytes = 4096;
-  constexpr long long block = block_bytes / sizeof(float); // 1024¸öfloat
+  constexpr long long block = block_bytes / sizeof(float); // 1024ï¿½ï¿½float
 
   constexpr long long n = 1 << 28; // 512MiB
   std::vector<float> arr(n, 0.f);
@@ -647,7 +647,7 @@ static void BM_rand_blk_4096_seq_base_aligned(benchmark::State &bm) {
 
   constexpr long long n = 1 << 28; // 512MiB
   constexpr long long block_bytes = 4096;
-  constexpr long long block = block_bytes / sizeof(float); // 1024¸öfloat
+  constexpr long long block = block_bytes / sizeof(float); // 1024ï¿½ï¿½float
 
   const auto order = make_order(n / block);
 
@@ -1555,7 +1555,7 @@ static void BM_transpose_tiling_tbb(benchmark::State &bm) {
 }
 #endif
 
-constexpr std::size_t size = 1 << 10;
+constexpr long long size = 1 << 10;
 hpc::HPCHighDimensionFlatArray<2, float> ma(size, size);
 hpc::HPCHighDimensionFlatArray<2, float> mb(size, size);
 hpc::HPCHighDimensionFlatArray<2, float> mc(size, size);
@@ -1586,7 +1586,7 @@ static void BM_matrix_mul(benchmark::State &bm) {
   }
 }
 
-constexpr std::size_t matrix_block = 32;
+constexpr long long matrix_block = 32;
 
 static void BM_matrix_mul_blocked(benchmark::State &bm) {
   init_matrix_mul();
