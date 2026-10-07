@@ -995,108 +995,153 @@ static void BM_loop_fusion_merged(benchmark::State &bm) {
   }
 }
 
+constexpr int nblur = 8;
+constexpr int nx = 1 << 13;
+constexpr int ny = 1 << 13;
+constexpr int blockSize = 64; // items(not bytes!)
+
+hpc::HPCHighDimensionFlatArray<2, float, nblur, nblur, 16> a(ny, nx);
+hpc::HPCHighDimensionFlatArray<2, float, 0, 0, 16> b(ny, nx);
+
+static void init_blur_input() {
+          for (int y = 0; y < ny; ++y)
+                    for (int x = 0; x < nx; ++x)
+                              a(y, x) = float((x + 3 * y) % 31 - 15) / 16.f;
+}
+
+static inline void store_sse(float* p, __m128 value) {
+          if (reinterpret_cast<std::uintptr_t>(p) % 16 == 0)
+                    _mm_stream_ps(p, value);		 //must be aligned to 16
+          else
+                    _mm_storeu_ps(p, value);		//normal one
+}
+
+static void BM_x_blur(benchmark::State &bm) {
+
+          init_blur_input();
+          for (auto _ : bm) {
+#pragma omp parallel for collapse(2) schedule(static)
+                    for (int y = 0; y < ny; ++y) {
+                              for (int x = 0; x < nx; ++x) {
+                                        float res = 0.f;
+                                        for (int blur = -nblur; blur <= nblur; ++blur)
+                                                  res += a(y, x + blur);
+                                        b(y, x) = res;
+                              }
+                    }
+                    benchmark::DoNotOptimize(b.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
+static void BM_x_blur_prefetch(benchmark::State& bm) {
+          init_blur_input();
+          for (auto _ : bm) {
+#pragma omp parallel for collapse(2) schedule(static)
+                    for (int y = 0; y < ny; ++y) {
+                              for (int x = 0; x < nx; ++x) {
+                                        float res = 0.f;
+                                        // prefetch should not out of array's bound
+                                        if (x + 2 * nblur < nx)
+                                                  _mm_prefetch((const char*)&a(y, x + 2 * nblur), _MM_HINT_T0);
+                                        for (int blur = -nblur; blur <= nblur; ++blur)
+                                                  res += a(y, x + blur);
+                                        b(y, x) = res;
+                              }
+                    }
+                    benchmark::DoNotOptimize(b.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
+static void BM_x_blur_cond_prefetch(benchmark::State &bm) {
+          init_blur_input();
+  for (auto _ : bm) {
+#pragma omp parallel for collapse(2) schedule(static)
+    for (int y = 0; y < ny; ++y) {
+      for (int x = 0; x < nx; ++x) {
+        float res = {0.f};
+        if ((x & 15) == 0 && x + 2 * nblur < nx)    //x % 16 == 0
+                  _mm_prefetch((const char*)&a(y, x + 2 * nblur), _MM_HINT_T0);
+
+        for (int blur = -nblur; blur <= nblur; ++blur) {
+          res += a(y, x + blur);
+        }
+        b(y, x) = res;
+      }
+    }
+    benchmark::DoNotOptimize(a);
+  }
+}
+
+static void BM_x_blur_tiling_prefetch(benchmark::State& bm) {
+          init_blur_input();
+          constexpr int B = 2 * nblur;
+          static_assert(B > 0);
+
+          for (auto _ : bm) {
+#pragma omp parallel for collapse(2) schedule(static)
+                    for (int y = 0; y < ny; ++y) {
+                              for (int xBase = 0; xBase < nx; xBase += B) {
+
+
+                                        if (xBase + B < nx)
+                                                  _mm_prefetch((const char*)&a(y, xBase + B), _MM_HINT_T0);
+                                        for (int x = xBase; x < std::min(xBase + B, nx); ++x) {
+                                                  float res = 0.f;
+                                                  for (int blur = -nblur; blur <= nblur; ++blur)
+                                                            res += a(y, x + blur);
+                                                  b(y, x) = res;
+                                        }
+                              }
+                    }
+                    benchmark::DoNotOptimize(b.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
+static void BM_x_blur_tiling_simd_prefetch(benchmark::State& bm) {
+          init_blur_input();
+          constexpr int B = 2 * nblur;
+
+          for (auto _ : bm) {
+#pragma omp parallel
+                    {
+#pragma omp for collapse(2) schedule(static) nowait
+                              for (int y = 0; y < ny; ++y) {
+                                        for (int xBase = 0; xBase < nx; xBase += B) {
+                                                  const int xEnd = std::min(xBase + B, nx);
+                                                  if (xBase + B < nx)
+                                                            _mm_prefetch((const char*)&a(y, xBase + B), _MM_HINT_T0);
+                                                  int x = xBase;
+                                                  for (; x + 4 <= xEnd; x += 4) {
+                                                            __m128 res = _mm_setzero_ps();
+                                                            for (int blur = -nblur; blur <= nblur; ++blur)
+                                                                      res = _mm_add_ps(res, _mm_loadu_ps(&a(y, x + blur)));
+                                                            store_sse(&b(y, x), res);
+                                                  }
+                                                  for (; x < xEnd; ++x) { //handle reminder!
+                                                            float res = 0.f;
+                                                            for (int blur = -nblur; blur <= nblur; ++blur)
+                                                                      res += a(y, x + blur);
+                                                            b(y, x) = res;
+                                                  }
+                                        }
+                              }
+                              _mm_sfence(); // make sure all NT store executed and flush, then execute parallel section!
+                    }
+                    benchmark::DoNotOptimize(b.data());
+                    benchmark::ClobberMemory();
+          }
+}
+
 constexpr std::size_t m = 1 << 13;
 constexpr std::size_t n = 1 << 15;
 std::vector<float> arr(n);
 
 #define N (1024 * 1024)
 
-constexpr int nblur = 8;
-constexpr std::size_t nx = 1 << 13;
-constexpr std::size_t ny = 1 << 13;
-hpc::HPCHighDimensionFlatArray<2, float, nblur> a(nx, ny);
-hpc::HPCHighDimensionFlatArray<2, float> b(nx, ny);
-
-static void BM_x_blur(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int x = 0; x < nx; ++x) {
-        float res = {0.f};
-        for (int blur = -nblur; blur <= nblur; ++blur) {
-          res += a(y, x + blur);
-        }
-        b(y, x) = res;
-      }
-    }
-    benchmark::DoNotOptimize(a);
-  }
-}
-
-static void BM_x_blur_prefetch(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int x = 0; x < nx; ++x) {
-        float res = {0.f};
-        _mm_prefetch((const char *)&a(y, x + 2 * nblur), _MM_HINT_T0);
-        for (int blur = -nblur; blur <= nblur; ++blur) {
-          res += a(y, x + blur);
-        }
-        b(y, x) = res;
-      }
-    }
-    benchmark::DoNotOptimize(a);
-  }
-}
-
-static void BM_x_blur_cond_prefetch(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int x = 0; x < nx; ++x) {
-        float res = {0.f};
-        if (x % 16) {
-          _mm_prefetch((const char *)&a(y, x + 2 * nblur), _MM_HINT_T0);
-        }
-        for (int blur = -nblur; blur <= nblur; ++blur) {
-          res += a(y, x + blur);
-        }
-        b(y, x) = res;
-      }
-    }
-    benchmark::DoNotOptimize(a);
-  }
-}
-
-static void BM_x_blur_tiling_prefetch(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int xBase = 0; xBase < static_cast<int>(nx); xBase += 2 * nblur) {
-        _mm_prefetch((const char *)&a(y, xBase + 2 * nblur), _MM_HINT_T0);
-        for (int x = xBase; x < xBase + 2 * nblur; ++x) {
-          float res = {0.f};
-          for (int blur = -nblur; blur <= nblur; ++blur) {
-            res += a(y, x + blur);
-          }
-          b(y, x) = res;
-        }
-      }
-    }
-    benchmark::DoNotOptimize(a);
-  }
-}
-
-static void BM_x_blur_tiling_simd_prefetch(benchmark::State &bm) {
-  for (auto _ : bm) {
-#pragma omp parallel for collapse(2)
-    for (int y = 0; y < ny; ++y) {
-      for (int xBase = 0; xBase < static_cast<int>(nx); xBase += 2 * nblur) {
-        _mm_prefetch((const char *)&a(y, xBase + 2 * nblur), _MM_HINT_T0);
-        for (int x = xBase; x < xBase + 2 * nblur; x += 4) {
-          __m128 res = _mm_setzero_ps();
-          for (int blur = -nblur; blur <= nblur; ++blur)
-            res = _mm_add_ps(_mm_loadu_ps(&a(y, x + blur)), res);
-          _mm_stream_ps(&b(y, x), res);
-        }
-      }
-    }
-    benchmark::DoNotOptimize(a);
-  }
-}
-
-constexpr int blockSize = 64;
+//constexpr int blockSize = 64;
 static void BM_y_blur(benchmark::State &bm) {
   for (auto _ : bm) {
 #pragma omp parallel for collapse(2)
@@ -2239,11 +2284,11 @@ BENCHMARK(BM_YX)->UseRealTime();
 BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
 BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
 
-BENCHMARK(BM_x_blur);
-BENCHMARK(BM_x_blur_prefetch);
-BENCHMARK(BM_x_blur_cond_prefetch);
-BENCHMARK(BM_x_blur_tiling_prefetch);
-BENCHMARK(BM_x_blur_tiling_simd_prefetch);
+BENCHMARK(BM_x_blur)->UseRealTime();
+BENCHMARK(BM_x_blur_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_cond_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_tiling_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_tiling_simd_prefetch)->UseRealTime();
 
 BENCHMARK(BM_y_blur);
 BENCHMARK(BM_y_blur_tiling);
