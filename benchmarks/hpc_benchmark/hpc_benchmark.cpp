@@ -1135,279 +1135,293 @@ static void BM_x_blur_tiling_simd_prefetch(benchmark::State &bm) {
   }
 }
 
-static void BM_y_blur(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_y_blur(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (int y = 0; y < ny; ++y) {
-                              for (int x = 0; x < nx; ++x) {
-                                        float res = 0.f;
-                                        for (int blur = -nblur; blur <= nblur; ++blur)
-                                                  res += a(y + blur, x);
-                                        b(y, x) = res;
-                              }
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
-          }
+    for (int y = 0; y < ny; ++y) {
+      for (int x = 0; x < nx; ++x) {
+        float res = 0.f;
+        for (int blur = -nblur; blur <= nblur; ++blur)
+          res += a(y + blur, x);
+        b(y, x) = res;
+      }
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_y_blur_tiling(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_y_blur_tiling(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (int yBase = 0; yBase < ny; yBase += blockSize) {     // Y
-                              for (int xBase = 0; xBase < nx; xBase += blockSize) { // X
-                                        for (int y = yBase; y < std::min(yBase + blockSize, ny); ++y) {
-                                                  for (int x = xBase; x < std::min(xBase + blockSize, nx); ++x) {
-                                                            float res = 0.f;
-                                                            for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                      res += a(y + blur, x);
-                                                            b(y, x) = res;
-                                                  }
-                                        }
-                              }
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
+    for (int yBase = 0; yBase < ny; yBase += blockSize) {   // Y
+      for (int xBase = 0; xBase < nx; xBase += blockSize) { // X
+        for (int y = yBase; y < std::min(yBase + blockSize, ny); ++y) {
+          for (int x = xBase; x < std::min(xBase + blockSize, nx); ++x) {
+            float res = 0.f;
+            for (int blur = -nblur; blur <= nblur; ++blur)
+              res += a(y + blur, x);
+            b(y, x) = res;
           }
+        }
+      }
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_Xyx_blur_tiling(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_Xyx_blur_tiling(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (int xBase = 0; xBase < nx; xBase += blockSize) {       // X
-                              for (int y = 0; y < ny; ++y) {                         // y
-                                        for (int x = xBase; x < std::min(xBase + blockSize, nx); ++x) {
-                                                  float res = 0.f;
-                                                  for (int blur = -nblur; blur <= nblur; ++blur)
-                                                            res += a(y + blur, x);
-                                                  b(y, x) = res;
-                                        }
-                              }
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
-          }
+    for (int xBase = 0; xBase < nx; xBase += blockSize) { // X
+      for (int y = 0; y < ny; ++y) {                      // y
+        for (int x = xBase; x < std::min(xBase + blockSize, nx); ++x) {
+          float res = 0.f;
+          for (int blur = -nblur; blur <= nblur; ++blur)
+            res += a(y + blur, x);
+          b(y, x) = res;
+        }
+      }
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_Xyx_blur_tiling_prefetch(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_Xyx_blur_tiling_prefetch(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for collapse(2) schedule(static) nowait
-                              for (int xBase = 0; xBase < nx; xBase += blockSize) {
+      for (int xBase = 0; xBase < nx; xBase += blockSize) {
 
-                                        const int xEnd = std::min(xBase + blockSize, nx);
+        const int xEnd = std::min(xBase + blockSize, nx);
 
-                                        for (int y = 0; y < ny; ++y) {
+        for (int y = 0; y < ny; ++y) {
 
-                                                  _mm_prefetch((const char*)&a(y + nblur, xBase), _MM_HINT_T0);
-                                                  int x = xBase;
+          _mm_prefetch((const char *)&a(y + nblur, xBase), _MM_HINT_T0);
+          int x = xBase;
 
-                                                  for (; x + 4 <= xEnd; x += 4) {
-                                                            __m128 res = _mm_setzero_ps();
-                                                            for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                      res = _mm_add_ps(res, _mm_loadu_ps(&a(y + blur, x)));
-                                                            store_sse(&b(y, x), res);
-                                                  }
-                                                  for (; x < xEnd; ++x) {
-                                                            float res = 0.f;
-                                                            for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                      res += a(y + blur, x);
-                                                            b(y, x) = res;
-                                                  }
-                                        }
-                              }
-                              _mm_sfence();
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
+          for (; x + 4 <= xEnd; x += 4) {
+            __m128 res = _mm_setzero_ps();
+            for (int blur = -nblur; blur <= nblur; ++blur)
+              res = _mm_add_ps(res, _mm_loadu_ps(&a(y + blur, x)));
+            store_sse(&b(y, x), res);
           }
+          for (; x < xEnd; ++x) {
+            float res = 0.f;
+            for (int blur = -nblur; blur <= nblur; ++blur)
+              res += a(y + blur, x);
+            b(y, x) = res;
+          }
+        }
+      }
+      _mm_sfence();
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_Xyx_blur_tiling_prefetch_streamed_merged(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_Xyx_blur_tiling_prefetch_streamed_merged(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for collapse(2) schedule(static) nowait
-                              for (int xBase = 0; xBase < nx; xBase += blockSize) {
-                                        const int xEnd = std::min(xBase + blockSize, nx);
-                                        for (int y = 0; y < ny; ++y) {
-                                                  _mm_prefetch((const char*)&a(y + nblur, xBase), _MM_HINT_T0);
-                                                  int x = xBase;
-                                                  for (; x + 16 <= xEnd; x += 16) {
-                                                            __m128 res[4];
-                                                            for (int offset = 0; offset < 4; ++offset)
-                                                                      res[offset] = _mm_setzero_ps();
-                                                            for (int offset = 0; offset < 4; ++offset)
-                                                                      for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                                res[offset] = _mm_add_ps(res[offset], _mm_loadu_ps(&a(y + blur, x + offset * 4)));
-                                                            for (int offset = 0; offset < 4; ++offset)
-                                                                      store_sse(&b(y, x + offset * 4), res[offset]);
-                                                  }
-                                                  for (; x < xEnd; ++x) {
-                                                            float res = 0.f;
-                                                            for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                      res += a(y + blur, x);
-                                                            b(y, x) = res;
-                                                  }
-                                        }
-                              }
-                              _mm_sfence();
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
+      for (int xBase = 0; xBase < nx; xBase += blockSize) {
+        const int xEnd = std::min(xBase + blockSize, nx);
+        for (int y = 0; y < ny; ++y) {
+          _mm_prefetch((const char *)&a(y + nblur, xBase), _MM_HINT_T0);
+          int x = xBase;
+          for (; x + 16 <= xEnd; x += 16) {
+            __m128 res[4];
+            for (int offset = 0; offset < 4; ++offset)
+              res[offset] = _mm_setzero_ps();
+            for (int offset = 0; offset < 4; ++offset)
+              for (int blur = -nblur; blur <= nblur; ++blur)
+                res[offset] = _mm_add_ps(
+                    res[offset], _mm_loadu_ps(&a(y + blur, x + offset * 4)));
+            for (int offset = 0; offset < 4; ++offset)
+              store_sse(&b(y, x + offset * 4), res[offset]);
           }
+          for (; x < xEnd; ++x) {
+            float res = 0.f;
+            for (int blur = -nblur; blur <= nblur; ++blur)
+              res += a(y + blur, x);
+            b(y, x) = res;
+          }
+        }
+      }
+      _mm_sfence();
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_Xyx_blur_tiling_prefetch_streamed_ILP(benchmark::State& bm) {
-          init_blur_input();
-          for (auto _ : bm) {
+static void BM_Xyx_blur_tiling_prefetch_streamed_ILP(benchmark::State &bm) {
+  init_blur_input();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for collapse(2) schedule(static) nowait
-                              for (int xBase = 0; xBase < nx; xBase += blockSize) {
-                                        const int xEnd = std::min(xBase + blockSize, nx);
-                                        for (int y = 0; y < ny; ++y) {
-                                                  _mm_prefetch((const char*)&a(y + nblur, xBase), _MM_HINT_T0);
-                                                  int x = xBase;
-                                                  for (; x + 16 <= xEnd; x += 16) {
-                                                            __m128 res[4];
-                                                            for (int offset = 0; offset < 4; ++offset)
-                                                                      res[offset] = _mm_setzero_ps();
-                                                            //for (int offset = 0; offset < 4; ++offset)
-                                                            //          for (int blur = -nblur; blur <= nblur; ++blur)
-                                                            //                    res[offset] = _mm_add_ps(res[offset], _mm_loadu_ps(&a(y + blur, x + offset * 4)));
-                                                            for (int blur = -nblur; blur <= nblur; ++blur) {
-                                                                      res[0] = _mm_add_ps(res[0], _mm_loadu_ps(&a(y + blur, x + 0 * 4)));
-                                                                      res[1] = _mm_add_ps(res[1], _mm_loadu_ps(&a(y + blur, x + 1 * 4)));
-                                                                      res[2] = _mm_add_ps(res[2], _mm_loadu_ps(&a(y + blur, x + 2 * 4)));
-                                                                      res[3] = _mm_add_ps(res[3], _mm_loadu_ps(&a(y + blur, x + 3 * 4)));
-                                                            }
+      for (int xBase = 0; xBase < nx; xBase += blockSize) {
+        const int xEnd = std::min(xBase + blockSize, nx);
+        for (int y = 0; y < ny; ++y) {
+          _mm_prefetch((const char *)&a(y + nblur, xBase), _MM_HINT_T0);
+          int x = xBase;
+          for (; x + 16 <= xEnd; x += 16) {
+            __m128 res[4];
+            for (int offset = 0; offset < 4; ++offset)
+              res[offset] = _mm_setzero_ps();
+            // for (int offset = 0; offset < 4; ++offset)
+            //           for (int blur = -nblur; blur <= nblur; ++blur)
+            //                     res[offset] = _mm_add_ps(res[offset],
+            //                     _mm_loadu_ps(&a(y + blur, x + offset * 4)));
+            for (int blur = -nblur; blur <= nblur; ++blur) {
+              res[0] =
+                  _mm_add_ps(res[0], _mm_loadu_ps(&a(y + blur, x + 0 * 4)));
+              res[1] =
+                  _mm_add_ps(res[1], _mm_loadu_ps(&a(y + blur, x + 1 * 4)));
+              res[2] =
+                  _mm_add_ps(res[2], _mm_loadu_ps(&a(y + blur, x + 2 * 4)));
+              res[3] =
+                  _mm_add_ps(res[3], _mm_loadu_ps(&a(y + blur, x + 3 * 4)));
+            }
 
-                                                            for (int offset = 0; offset < 4; ++offset)
-                                                                      store_sse(&b(y, x + offset * 4), res[offset]);
-                                                  }
-                                                  for (; x < xEnd; ++x) {
-                                                            float res = 0.f;
-                                                            for (int blur = -nblur; blur <= nblur; ++blur)
-                                                                      res += a(y + blur, x);
-                                                            b(y, x) = res;
-                                                  }
-                                        }
-                              }
-                              _mm_sfence();
-                    }
-                    benchmark::DoNotOptimize(b.data());
-                    benchmark::ClobberMemory();
+            for (int offset = 0; offset < 4; ++offset)
+              store_sse(&b(y, x + offset * 4), res[offset]);
           }
+          for (; x < xEnd; ++x) {
+            float res = 0.f;
+            for (int blur = -nblur; blur <= nblur; ++blur)
+              res += a(y + blur, x);
+            b(y, x) = res;
+          }
+        }
+      }
+      _mm_sfence();
+    }
+    benchmark::DoNotOptimize(b.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 #if defined(__x86_64__) || defined(_WIN64)
 hpc::HPCHighDimensionFlatArray<2, float, nblur, nblur, 32> a_avx(ny, nx);
 hpc::HPCHighDimensionFlatArray<2, float, 0, 0, 32> b_avx(ny, nx);
 
-static inline void store_avx(float* p, __m256 value) {
-          if (reinterpret_cast<std::uintptr_t>(p) % 32 == 0)
-                    _mm256_stream_ps(p, value);
-          else
-                    _mm256_storeu_ps(p, value);
+static inline void store_avx(float *p, __m256 value) {
+  if (reinterpret_cast<std::uintptr_t>(p) % 32 == 0)
+    _mm256_stream_ps(p, value);
+  else
+    _mm256_storeu_ps(p, value);
 }
 
 static void init_avx_input() {
-          init_blur_input();
-          for (int y = 0; y < ny; ++y)
-                    for (int x = 0; x < nx; ++x)
-                              a_avx(y, x) = a(y, x);
+  init_blur_input();
+  for (int y = 0; y < ny; ++y)
+    for (int x = 0; x < nx; ++x)
+      a_avx(y, x) = a(y, x);
 }
 
-static void BM_YXx_blur_tiling_prefetch_streamed_AVX2(benchmark::State& bm) {
-          init_avx_input();
-          for (auto _ : bm) {
+static void BM_YXx_blur_tiling_prefetch_streamed_AVX2(benchmark::State &bm) {
+  init_avx_input();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for schedule(static) nowait
-                              for (int y = 0; y < ny; ++y) {
-                                        int x = 0;
-                                        for (; x + 32 <= nx; x += 32) { // 4x __m256 = 128B
-                                                  _mm_prefetch((const char*)&a_avx(y + nblur, x), _MM_HINT_T0);
-                                                  _mm_prefetch((const char*)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
+      for (int y = 0; y < ny; ++y) {
+        int x = 0;
+        for (; x + 32 <= nx; x += 32) { // 4x __m256 = 128B
+          _mm_prefetch((const char *)&a_avx(y + nblur, x), _MM_HINT_T0);
+          _mm_prefetch((const char *)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
 
-
-                                                  __m256 res[4];
-                                                  for (int offset = 0; offset < 4; ++offset)
-                                                            res[offset] = _mm256_setzero_ps();
-                                                  for (int blur = -nblur; blur <= nblur; ++blur) {
-                                                            res[0] = _mm256_add_ps(res[0], _mm256_loadu_ps(&a_avx(y + blur, x + 0 * 8)));
-                                                            res[1] = _mm256_add_ps(res[1], _mm256_loadu_ps(&a_avx(y + blur, x + 1 * 8)));
-                                                            res[2] = _mm256_add_ps(res[2], _mm256_loadu_ps(&a_avx(y + blur, x + 2 * 8)));
-                                                            res[3] = _mm256_add_ps(res[3], _mm256_loadu_ps(&a_avx(y + blur, x + 3 * 8)));
-                                                  }
-                                                  for (int offset = 0; offset < 4; ++offset)
-                                                            store_avx(&b_avx(y, x + offset * 8), res[offset]);
-                                        }
-                                        for (; x < nx; ++x) {
-                                                  float res = 0.f;
-                                                  for (int blur = -nblur; blur <= nblur; ++blur)
-                                                            res += a_avx(y + blur, x);
-                                                  b_avx(y, x) = res;
-                                        }
-                              }
-                              _mm_sfence();
-                    }
-                    benchmark::DoNotOptimize(b_avx.data());
-                    benchmark::ClobberMemory();
+          __m256 res[4];
+          for (int offset = 0; offset < 4; ++offset)
+            res[offset] = _mm256_setzero_ps();
+          for (int blur = -nblur; blur <= nblur; ++blur) {
+            res[0] = _mm256_add_ps(
+                res[0], _mm256_loadu_ps(&a_avx(y + blur, x + 0 * 8)));
+            res[1] = _mm256_add_ps(
+                res[1], _mm256_loadu_ps(&a_avx(y + blur, x + 1 * 8)));
+            res[2] = _mm256_add_ps(
+                res[2], _mm256_loadu_ps(&a_avx(y + blur, x + 2 * 8)));
+            res[3] = _mm256_add_ps(
+                res[3], _mm256_loadu_ps(&a_avx(y + blur, x + 3 * 8)));
           }
+          for (int offset = 0; offset < 4; ++offset)
+            store_avx(&b_avx(y, x + offset * 8), res[offset]);
+        }
+        for (; x < nx; ++x) {
+          float res = 0.f;
+          for (int blur = -nblur; blur <= nblur; ++blur)
+            res += a_avx(y + blur, x);
+          b_avx(y, x) = res;
+        }
+      }
+      _mm_sfence();
+    }
+    benchmark::DoNotOptimize(b_avx.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-static void BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance(benchmark::State& bm) {
-          init_avx_input();
-          for (auto _ : bm) {
+static void
+BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance(benchmark::State &bm) {
+  init_avx_input();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for schedule(static) nowait
-                              for (int y = 0; y < ny; ++y) {
-                                        int x = 0;
-                                        for (; x + 32 <= nx; x += 32) {
-                                                  _mm_prefetch((const char*)&a_avx(y + nblur, x), _MM_HINT_T0);
-                                                  _mm_prefetch((const char*)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
+      for (int y = 0; y < ny; ++y) {
+        int x = 0;
+        for (; x + 32 <= nx; x += 32) {
+          _mm_prefetch((const char *)&a_avx(y + nblur, x), _MM_HINT_T0);
+          _mm_prefetch((const char *)&a_avx(y + nblur, x + 16), _MM_HINT_T0);
 
-                                                  // prefetch more!
-                                                  if (x + 32 < nx)
-                                                            _mm_prefetch((const char*)&a_avx(y + nblur, x + 32), _MM_HINT_T0);
-                                                  if (x + 48 < nx)
-                                                            _mm_prefetch((const char*)&a_avx(y + nblur, x + 48), _MM_HINT_T0);
+          // prefetch more!
+          if (x + 32 < nx)
+            _mm_prefetch((const char *)&a_avx(y + nblur, x + 32), _MM_HINT_T0);
+          if (x + 48 < nx)
+            _mm_prefetch((const char *)&a_avx(y + nblur, x + 48), _MM_HINT_T0);
 
-                                                  __m256 res[4];
-                                                  for (int offset = 0; offset < 4; ++offset)
-                                                            res[offset] = _mm256_setzero_ps();
+          __m256 res[4];
+          for (int offset = 0; offset < 4; ++offset)
+            res[offset] = _mm256_setzero_ps();
 
-                                                  for (int blur = -nblur; blur <= nblur; ++blur) {
-                                                            res[0] = _mm256_add_ps(res[0], _mm256_loadu_ps(&a_avx(y + blur, x + 0 * 8)));
-                                                            res[1] = _mm256_add_ps(res[1], _mm256_loadu_ps(&a_avx(y + blur, x + 1 * 8)));
-                                                            res[2] = _mm256_add_ps(res[2], _mm256_loadu_ps(&a_avx(y + blur, x + 2 * 8)));
-                                                            res[3] = _mm256_add_ps(res[3], _mm256_loadu_ps(&a_avx(y + blur, x + 3 * 8)));
-                                                  }
-
-                                                  for (int offset = 0; offset < 4; ++offset)
-                                                            store_avx(&b_avx(y, x + offset * 8), res[offset]);
-                                        }
-                                        for (; x < nx; ++x) {
-                                                  float res = 0.f;
-                                                  for (int blur = -nblur; blur <= nblur; ++blur)
-                                                            res += a_avx(y + blur, x);
-                                                  b_avx(y, x) = res;
-                                        }
-                              }
-                              _mm_sfence();
-                    }
-                    benchmark::DoNotOptimize(b_avx.data());
-                    benchmark::ClobberMemory();
+          for (int blur = -nblur; blur <= nblur; ++blur) {
+            res[0] = _mm256_add_ps(
+                res[0], _mm256_loadu_ps(&a_avx(y + blur, x + 0 * 8)));
+            res[1] = _mm256_add_ps(
+                res[1], _mm256_loadu_ps(&a_avx(y + blur, x + 1 * 8)));
+            res[2] = _mm256_add_ps(
+                res[2], _mm256_loadu_ps(&a_avx(y + blur, x + 2 * 8)));
+            res[3] = _mm256_add_ps(
+                res[3], _mm256_loadu_ps(&a_avx(y + blur, x + 3 * 8)));
           }
+
+          for (int offset = 0; offset < 4; ++offset)
+            store_avx(&b_avx(y, x + offset * 8), res[offset]);
+        }
+        for (; x < nx; ++x) {
+          float res = 0.f;
+          for (int blur = -nblur; blur <= nblur; ++blur)
+            res += a_avx(y + blur, x);
+          b_avx(y, x) = res;
+        }
+      }
+      _mm_sfence();
+    }
+    benchmark::DoNotOptimize(b_avx.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 #endif
