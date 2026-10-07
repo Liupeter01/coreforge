@@ -1554,68 +1554,99 @@ static void BM_matrix_mul_blocked(benchmark::State &bm) {
   }
 }
 
-constexpr int conv_block = 4;
+constexpr int conv_block = 16;
 constexpr int conv_n = 1 << 10;
 constexpr int nkern = 16;
 hpc::HPCHighDimensionFlatArray<2, float> ka(conv_n, conv_n);
 hpc::HPCHighDimensionFlatArray<2, float, nkern> kb(conv_n, conv_n);
 hpc::HPCHighDimensionFlatArray<2, float> kc(nkern, nkern);
 
-static void BM_conv(benchmark::State &bm) {
-  for (auto _ : bm) {
-    bm.PauseTiming();
-    ka.zero();
-    bm.ResumeTiming();
+static void init_conv_input() {
+          for (int y = 0; y < conv_n; ++y)
+                    for (int x = 0; x < conv_n; ++x)
+                              kb(y, x) = float((x + 3 * y) % 31 - 15) / 16.f;
+          for (int l = 0; l < nkern; ++l)
+                    for (int k = 0; k < nkern; ++k)
+                              kc(l, k) = float((l + 2 * k) % 7 - 3) / 16.f;
+}
 
-    for (int y = 0; y < conv_n; y++) {
-      for (int x = 0; x < conv_n; ++x) {
-        for (int l = 0; l < nkern; ++l) {
-          for (int k = 0; k < nkern; ++k) {
-            ka(y, x) += kb(y + l, x + k) * kc(l, k);
+static void BM_conv(benchmark::State& bm) {
+          init_conv_input();
+          for (auto _ : bm) {
+                    for (int y = 0; y < conv_n; ++y) {
+                              for (int x = 0; x < conv_n; ++x) {
+                                        float res = 0.f;
+                                        for (int l = 0; l < nkern; ++l)
+                                                  for (int k = 0; k < nkern; ++k)
+                                                            res += kb(y + l, x + k) * kc(l, k);
+                                        ka(y, x) = res;
+                              }
+                    }
+                    benchmark::DoNotOptimize(ka.data());
+                    benchmark::ClobberMemory();
           }
-        }
-      }
-    }
-    benchmark::DoNotOptimize(ka);
-  }
 }
 
-static void BM_conv_block(benchmark::State &bm) {
-  for (auto _ : bm) {
+static void BM_conv_block(benchmark::State& bm) {
+          init_conv_input();
+          for (auto _ : bm) {
+                    for (int yBase = 0; yBase < conv_n; yBase += conv_block) {
+                              for (int xBase = 0; xBase < conv_n; xBase += conv_block) {
+                                        const int yEnd = std::min(yBase + conv_block, conv_n);
+                                        const int xEnd = std::min(xBase + conv_block, conv_n);
 
-    bm.PauseTiming();
-    ka.zero();
-    bm.ResumeTiming();
+                                        //clean the value
+                                        for (int y = yBase; y < yEnd; ++y)
+                                                  for (int x = xBase; x < xEnd; ++x)
+                                                            ka(y, x) = 0.f; 
 
-    for (int yBase = 0; yBase < conv_n; yBase += conv_block)
-      for (int xBase = 0; xBase < conv_n; xBase += conv_block)
-        for (int l = 0; l < nkern; ++l)
-          for (int k = 0; k < nkern; ++k)
-            for (int y = yBase; y < yBase + conv_block; ++y)
-              for (int x = xBase; x < xBase + conv_block; ++x)
-                ka(y, x) += kb(y + l, x + k) * kc(l, k);
-
-    benchmark::DoNotOptimize(ka);
-  }
+                                        for (int l = 0; l < nkern; ++l)
+                                                  for (int k = 0; k < nkern; ++k)
+                                                            for (int y = yBase; y < yEnd; ++y)
+                                                                      for (int x = xBase; x < xEnd; ++x)
+                                                                                ka(y, x) += kb(y + l, x + k) * kc(l, k);
+                              }
+                    }
+                    benchmark::DoNotOptimize(ka.data());
+                    benchmark::ClobberMemory();
+          }
 }
 
-// static void BM_conv_block_unroll(benchmark::State &bm) {
-//   for (auto _ : bm) {
-//             bm.PauseTiming();
-//             ka.zero();
-//             bm.ResumeTiming();
-//
-//     for (int yBase = 0; yBase < conv_n; yBase += conv_block)
-//       for (int xBase = 0; xBase < conv_n; xBase += conv_block)
-//         for (int l = 0; l < nkern; ++l)
-//           for (int k = 0; k < nkern; ++k)
-//             for (int y = yBase; y < yBase + conv_block; ++y)
-//               for (int x = xBase; x < xBase + conv_block; ++x)
-//                 ka(y, x) += kb(y + l, x + k) * kc(l, k);
-//
-//     benchmark::DoNotOptimize(ka);
-//   }
-// }
+static void BM_conv_block_unroll(benchmark::State& bm) {
+          init_conv_input();
+          for (auto _ : bm) {
+                    for (int yBase = 0; yBase < conv_n; yBase += conv_block) {
+                              for (int xBase = 0; xBase < conv_n; xBase += conv_block) {
+                                        const int yEnd = std::min(yBase + conv_block, conv_n);
+                                        const int xEnd = std::min(xBase + conv_block, conv_n);
+                                        for (int y = yBase; y < yEnd; ++y)
+                                                  for (int x = xBase; x < xEnd; ++x)
+                                                            ka(y, x) = 0.f;
+
+                                        for (int y = yBase; y < yEnd; ++y) {
+                                                  for (int x = xBase; x < xEnd; ++x) {
+                                                            int temp = 0.f;
+                                                            for (int l = 0; l < nkern; ++l) {
+                                                                      int k = 0;
+                                                                      for (; k + 3 < nkern; k += 4) {
+                                                                                temp += kb(y + l, x + k + 0) * kc(l, k + 0);
+                                                                                temp += kb(y + l, x + k + 1) * kc(l, k + 1);
+                                                                                temp += kb(y + l, x + k + 2) * kc(l, k + 2);
+                                                                                temp += kb(y + l, x + k + 3) * kc(l, k + 3);
+                                                                      }
+                                                                      for (; k < nkern; ++k) {
+                                                                                temp += kb(y + l, x + k) * kc(l, k);
+                                                                      }
+                                                            }
+                                                            ka(y, x) = temp;
+                                                  }
+                                        }
+                              }
+                    }
+                    benchmark::DoNotOptimize(ka.data());
+                    benchmark::ClobberMemory();
+          }
+}
 
 constexpr std::size_t m = 1 << 13;
 constexpr std::size_t n = 1 << 15;
@@ -2268,117 +2299,117 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
-BENCHMARK(BM_fill_zero_serial);
-BENCHMARK(BM_fill_zero_parallel_omp);
+//BENCHMARK(BM_fill_zero_serial);
+//BENCHMARK(BM_fill_zero_parallel_omp);
+//
+//#if COREFORGE_USE_TBB
+//BENCHMARK(BM_fill_zero_parallel_tbb);
+//#endif
+//
+//BENCHMARK(BM_sin_serial);
+//BENCHMARK(BM_sin_parallel_omp);
+//
+//#if COREFORGE_USE_TBB
+//BENCHMARK(BM_sin_parallel_tbb);
+//#endif
+//
+//BENCHMARK(BM_serial_simple_inc);
+//BENCHMARK(BM_serial_complex_inc);
+//BENCHMARK(BM_parallel_simple_inc);
+//BENCHMARK(BM_parallel_complex_inc);
+//
+//BENCHMARK(BM_strided)
+//    ->Arg(1)
+//    ->Arg(2)
+//    ->Arg(4)
+//    ->Arg(8)
+//    ->Arg(16)
+//    ->Arg(32)
+//    ->Arg(64)
+//    ->Arg(128)
+//    ->UseRealTime();
+//
+//BENCHMARK(BM_fill)
+//    ->Arg(16 * 1024)
+//    ->Arg(128 * 1024)
+//    ->Arg(1024 * 1024)
+//    ->Arg(16 * 1024 * 1024)
+//    ->Arg(128 * 1024 * 1024)
+//    ->Arg(1024 * 1024 * 1024)
+//    ->UseRealTime();
+//
+//BENCHMARK(BM_AOS_partical)->UseRealTime();
+//BENCHMARK(BM_SOA_partical)->UseRealTime();
+//BENCHMARK(BM_AOSOA_partical)->UseRealTime();
+//BENCHMARK(BM_AOS_all_properties)->UseRealTime();
+//BENCHMARK(BM_SOA_all_properties)->UseRealTime();
+//BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
+//
+//BENCHMARK(BM_ordered)->UseRealTime();
+//BENCHMARK(BM_random)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
+//BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
+//BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
+//
+//BENCHMARK(BM_read)->UseRealTime();
+//BENCHMARK(BM_read_and_write)->UseRealTime();
+//BENCHMARK(BM_write)->UseRealTime();
+//BENCHMARK(BM_write_zero)->UseRealTime();
+//BENCHMARK(BM_write_one)->UseRealTime();
+//BENCHMARK(BM_write_streamed)->UseRealTime();
+//BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
+//
+//BENCHMARK(BM_origin)->UseRealTime();
+//BENCHMARK(BM_init)->UseRealTime();
+//
+//BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
+//BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
+//BENCHMARK(BM_java_style_random)->UseRealTime();
+//BENCHMARK(BM_flat_random)->UseRealTime();
+//
+//BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
+//BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
+//
+//BENCHMARK(BM_XY)->UseRealTime();
+//BENCHMARK(BM_YX)->UseRealTime();
+//
+//BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
+//BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
+//
+//BENCHMARK(BM_x_blur)->UseRealTime();
+//BENCHMARK(BM_x_blur_prefetch)->UseRealTime();
+//BENCHMARK(BM_x_blur_cond_prefetch)->UseRealTime();
+//BENCHMARK(BM_x_blur_tiling_prefetch)->UseRealTime();
+//BENCHMARK(BM_x_blur_tiling_simd_prefetch)->UseRealTime();
+//
+//BENCHMARK(BM_y_blur)->UseRealTime();
+//BENCHMARK(BM_y_blur_tiling)->UseRealTime();
+//BENCHMARK(BM_Xyx_blur_tiling)->UseRealTime();
+//BENCHMARK(BM_Xyx_blur_tiling_prefetch)->UseRealTime();
+//BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_merged)->UseRealTime();
+//BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_ILP)->UseRealTime();
+//
+//#if defined(__x86_64__) || defined(_WIN64)
+//BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2)->UseRealTime();
+//BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance)->UseRealTime();
+//#endif
+//
+//BENCHMARK(BM_transpose);
+//BENCHMARK(BM_transpose_tiling);
+//BENCHMARK(BM_transpose_tiling_morton2d);
+//BENCHMARK(BM_transpose_tiling_morton2d_stream);
+//#if COREFORGE_USE_TBB
+//BENCHMARK(BM_transpose_tiling_tbb);
+//#endif
+//
+//BENCHMARK(BM_matrix_mul);
+//BENCHMARK(BM_matrix_mul_blocked);
 
-#if COREFORGE_USE_TBB
-BENCHMARK(BM_fill_zero_parallel_tbb);
-#endif
-
-BENCHMARK(BM_sin_serial);
-BENCHMARK(BM_sin_parallel_omp);
-
-#if COREFORGE_USE_TBB
-BENCHMARK(BM_sin_parallel_tbb);
-#endif
-
-BENCHMARK(BM_serial_simple_inc);
-BENCHMARK(BM_serial_complex_inc);
-BENCHMARK(BM_parallel_simple_inc);
-BENCHMARK(BM_parallel_complex_inc);
-
-BENCHMARK(BM_strided)
-    ->Arg(1)
-    ->Arg(2)
-    ->Arg(4)
-    ->Arg(8)
-    ->Arg(16)
-    ->Arg(32)
-    ->Arg(64)
-    ->Arg(128)
-    ->UseRealTime();
-
-BENCHMARK(BM_fill)
-    ->Arg(16 * 1024)
-    ->Arg(128 * 1024)
-    ->Arg(1024 * 1024)
-    ->Arg(16 * 1024 * 1024)
-    ->Arg(128 * 1024 * 1024)
-    ->Arg(1024 * 1024 * 1024)
-    ->UseRealTime();
-
-BENCHMARK(BM_AOS_partical)->UseRealTime();
-BENCHMARK(BM_SOA_partical)->UseRealTime();
-BENCHMARK(BM_AOSOA_partical)->UseRealTime();
-BENCHMARK(BM_AOS_all_properties)->UseRealTime();
-BENCHMARK(BM_SOA_all_properties)->UseRealTime();
-BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
-
-BENCHMARK(BM_ordered)->UseRealTime();
-BENCHMARK(BM_random)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
-BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
-BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
-
-BENCHMARK(BM_read)->UseRealTime();
-BENCHMARK(BM_read_and_write)->UseRealTime();
-BENCHMARK(BM_write)->UseRealTime();
-BENCHMARK(BM_write_zero)->UseRealTime();
-BENCHMARK(BM_write_one)->UseRealTime();
-BENCHMARK(BM_write_streamed)->UseRealTime();
-BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
-
-BENCHMARK(BM_origin)->UseRealTime();
-BENCHMARK(BM_init)->UseRealTime();
-
-BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
-BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
-BENCHMARK(BM_java_style_random)->UseRealTime();
-BENCHMARK(BM_flat_random)->UseRealTime();
-
-BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
-BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
-
-BENCHMARK(BM_XY)->UseRealTime();
-BENCHMARK(BM_YX)->UseRealTime();
-
-BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
-BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
-
-BENCHMARK(BM_x_blur)->UseRealTime();
-BENCHMARK(BM_x_blur_prefetch)->UseRealTime();
-BENCHMARK(BM_x_blur_cond_prefetch)->UseRealTime();
-BENCHMARK(BM_x_blur_tiling_prefetch)->UseRealTime();
-BENCHMARK(BM_x_blur_tiling_simd_prefetch)->UseRealTime();
-
-BENCHMARK(BM_y_blur)->UseRealTime();
-BENCHMARK(BM_y_blur_tiling)->UseRealTime();
-BENCHMARK(BM_Xyx_blur_tiling)->UseRealTime();
-BENCHMARK(BM_Xyx_blur_tiling_prefetch)->UseRealTime();
-BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_merged)->UseRealTime();
-BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_ILP)->UseRealTime();
-
-#if defined(__x86_64__) || defined(_WIN64)
-BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2)->UseRealTime();
-BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance)->UseRealTime();
-#endif
-
-BENCHMARK(BM_transpose);
-BENCHMARK(BM_transpose_tiling);
-BENCHMARK(BM_transpose_tiling_morton2d);
-BENCHMARK(BM_transpose_tiling_morton2d_stream);
-#if COREFORGE_USE_TBB
-BENCHMARK(BM_transpose_tiling_tbb);
-#endif
-
-BENCHMARK(BM_matrix_mul);
-BENCHMARK(BM_matrix_mul_blocked);
-
-BENCHMARK(BM_conv);
-BENCHMARK(BM_conv_block);
-// BENCHMARK(BM_conv_block_unroll);
+BENCHMARK(BM_conv)->UseRealTime();
+BENCHMARK(BM_conv_block)->UseRealTime();
+BENCHMARK(BM_conv_block_unroll)->UseRealTime();
 
 BENCHMARK(BM_RootHashDense);
 BENCHMARK(BM_RootPointerPointerDense);
