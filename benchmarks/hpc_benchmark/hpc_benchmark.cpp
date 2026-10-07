@@ -1430,127 +1430,128 @@ hpc::HPCHighDimensionFlatArray<2, float> a_t(ny, nx);
 hpc::HPCHighDimensionFlatArray<2, float> b_t(nx, ny);
 
 static void init_transpose() {
-          for (std::size_t y = 0; y < ny; ++y)
-                    for (std::size_t x = 0; x < nx; ++x)
-                              a_t(y, x) = static_cast<float>((y * 131 + x) % 1021);
+  for (std::size_t y = 0; y < ny; ++y)
+    for (std::size_t x = 0; x < nx; ++x)
+      a_t(y, x) = static_cast<float>((y * 131 + x) % 1021);
 }
 
-static void BM_transpose(benchmark::State& bm) {
-          init_transpose();
-          for (auto _ : bm) {
+static void BM_transpose(benchmark::State &bm) {
+  init_transpose();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (long long y = 0; y < ny; ++y) {
-                              for (long long x = 0; x < nx; ++x)
-                                        b_t(x, y) = a_t(y, x);
-                    }
-                    benchmark::DoNotOptimize(b_t.data());
-                    benchmark::ClobberMemory();
-          }
+    for (long long y = 0; y < ny; ++y) {
+      for (long long x = 0; x < nx; ++x)
+        b_t(x, y) = a_t(y, x);
+    }
+    benchmark::DoNotOptimize(b_t.data());
+    benchmark::ClobberMemory();
+  }
 }
-//blocksize = 64, actuall blocked area = blockSize * blockSize * sizeof(float)
-static void BM_transpose_tiling(benchmark::State& bm) {
-          init_transpose();
-          for (auto _ : bm) {
+// blocksize = 64, actuall blocked area = blockSize * blockSize * sizeof(float)
+static void BM_transpose_tiling(benchmark::State &bm) {
+  init_transpose();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (int yBase = 0; yBase < ny; yBase += blockSize) {
-                              for (int xBase = 0; xBase < nx; xBase += blockSize) {
-                                        const auto yEnd = yBase + std::min(blockSize, ny - yBase);
-                                        const auto xEnd = xBase + std::min(blockSize, nx - xBase);
-                                        for (auto y = yBase; y < yEnd; ++y) {
-                                                  for (auto x = xBase; x < xEnd; ++x)
-                                                            b_t(x, y) = a_t(y, x);
-                                        }
-                              }
-                    }
-                    benchmark::DoNotOptimize(b_t.data());
-                    benchmark::ClobberMemory();
-          }
+    for (int yBase = 0; yBase < ny; yBase += blockSize) {
+      for (int xBase = 0; xBase < nx; xBase += blockSize) {
+        const auto yEnd = yBase + std::min(blockSize, ny - yBase);
+        const auto xEnd = xBase + std::min(blockSize, nx - xBase);
+        for (auto y = yBase; y < yEnd; ++y) {
+          for (auto x = xBase; x < xEnd; ++x)
+            b_t(x, y) = a_t(y, x);
+        }
+      }
+    }
+    benchmark::DoNotOptimize(b_t.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 static std::vector<uint_fast64_t> make_morton_tiles() {
-          constexpr auto blocksX = nx / blockSize + (nx % blockSize != 0);
-          constexpr auto blocksY = ny / blockSize + (ny % blockSize != 0);
-          static_assert(blocksX <= UINT32_MAX && blocksY <= UINT32_MAX);
+  constexpr auto blocksX = nx / blockSize + (nx % blockSize != 0);
+  constexpr auto blocksY = ny / blockSize + (ny % blockSize != 0);
+  static_assert(blocksX <= UINT32_MAX && blocksY <= UINT32_MAX);
 
-          std::vector<uint_fast64_t> codes;
-          for (std::size_t by = 0; by < blocksY; ++by)
-                    for (std::size_t bx = 0; bx < blocksX; ++bx)
-                              codes.push_back(libmorton::morton2D_64_encode(
-                                        static_cast<uint_fast32_t>(bx), static_cast<uint_fast32_t>(by)));
-          std::sort(codes.begin(), codes.end());
-          return codes;
+  std::vector<uint_fast64_t> codes;
+  for (std::size_t by = 0; by < blocksY; ++by)
+    for (std::size_t bx = 0; bx < blocksX; ++bx)
+      codes.push_back(libmorton::morton2D_64_encode(
+          static_cast<uint_fast32_t>(bx), static_cast<uint_fast32_t>(by)));
+  std::sort(codes.begin(), codes.end());
+  return codes;
 }
 
-static void BM_transpose_tiling_morton2d(benchmark::State& bm) {
-          init_transpose();
-          const auto codes = make_morton_tiles();
+static void BM_transpose_tiling_morton2d(benchmark::State &bm) {
+  init_transpose();
+  const auto codes = make_morton_tiles();
 
-          for (auto _ : bm) {
+  for (auto _ : bm) {
 #pragma omp parallel for schedule(static)
-                    for (long long t = 0; t < codes.size(); ++t) {
-                              uint_fast32_t bx{}, by{};
-                              libmorton::morton2D_64_decode(codes[t], bx, by);
-                              const int xBase = static_cast<int>(bx) * blockSize;
-                              const int yBase = static_cast<int>(by) * blockSize;
-                              const auto yEnd = yBase + std::min(blockSize, ny - yBase);
-                              const auto xEnd = xBase + std::min(blockSize, nx - xBase);
+    for (long long t = 0; t < codes.size(); ++t) {
+      uint_fast32_t bx{}, by{};
+      libmorton::morton2D_64_decode(codes[t], bx, by);
+      const int xBase = static_cast<int>(bx) * blockSize;
+      const int yBase = static_cast<int>(by) * blockSize;
+      const auto yEnd = yBase + std::min(blockSize, ny - yBase);
+      const auto xEnd = xBase + std::min(blockSize, nx - xBase);
 
-                              for (auto y = yBase; y < yEnd; ++y)
-                                        for (auto x = xBase; x < xEnd; ++x)
-                                                  b_t(x, y) = a_t(y, x);
-                    }
-                    benchmark::DoNotOptimize(b_t.data());
-                    benchmark::ClobberMemory();
-          }
+      for (auto y = yBase; y < yEnd; ++y)
+        for (auto x = xBase; x < xEnd; ++x)
+          b_t(x, y) = a_t(y, x);
+    }
+    benchmark::DoNotOptimize(b_t.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 hpc::HPCHighDimensionFlatArray<2, int> b_bits(nx, ny);
 
-static void BM_transpose_tiling_morton2d_stream(benchmark::State& bm) {
-          static_assert(sizeof(int) == 4 && sizeof(float) == 4);
-          init_transpose();
-          const auto codes = make_morton_tiles();
-          for (auto _ : bm) {
+static void BM_transpose_tiling_morton2d_stream(benchmark::State &bm) {
+  static_assert(sizeof(int) == 4 && sizeof(float) == 4);
+  init_transpose();
+  const auto codes = make_morton_tiles();
+  for (auto _ : bm) {
 #pragma omp parallel
-                    {
+    {
 #pragma omp for schedule(static) nowait
-                              for (long long t = 0; t < codes.size(); ++t) {
-                                        uint_fast32_t bx{}, by{};
-                                        libmorton::morton2D_64_decode(codes[t], bx, by);
-                                        const int xBase = static_cast<int>(bx) * blockSize;
-                                        const int yBase = static_cast<int>(by) * blockSize;
-                                        const auto yEnd = yBase + std::min(blockSize, ny - yBase);
-                                        const auto xEnd = xBase + std::min(blockSize, nx - xBase);
-                                        for (auto y = yBase; y < yEnd; ++y) {
-                                                  for (auto x = xBase; x < xEnd; ++x) {
-                                                            int bits;
-                                                            std::memcpy(&bits, &a_t(y, x), sizeof(bits));
-                                                            _mm_stream_si32(&b_bits(x, y), bits);
-                                                  }
-                                        }
-                              }
-                              _mm_sfence(); // 
-                    }
-                    benchmark::DoNotOptimize(b_bits.data());
-                    benchmark::ClobberMemory();
+      for (long long t = 0; t < codes.size(); ++t) {
+        uint_fast32_t bx{}, by{};
+        libmorton::morton2D_64_decode(codes[t], bx, by);
+        const int xBase = static_cast<int>(bx) * blockSize;
+        const int yBase = static_cast<int>(by) * blockSize;
+        const auto yEnd = yBase + std::min(blockSize, ny - yBase);
+        const auto xEnd = xBase + std::min(blockSize, nx - xBase);
+        for (auto y = yBase; y < yEnd; ++y) {
+          for (auto x = xBase; x < xEnd; ++x) {
+            int bits;
+            std::memcpy(&bits, &a_t(y, x), sizeof(bits));
+            _mm_stream_si32(&b_bits(x, y), bits);
           }
+        }
+      }
+      _mm_sfence(); //
+    }
+    benchmark::DoNotOptimize(b_bits.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 #if COREFORGE_USE_TBB
-static void BM_transpose_tiling_tbb(benchmark::State& bm) {
-          init_transpose();
-          for (auto _ : bm) {
-                    oneapi::tbb::parallel_for(
-                              oneapi::tbb::blocked_range2d<std::size_t>(
-                                        0, ny, blockSize, 0, nx, blockSize),
-                              [](const oneapi::tbb::blocked_range2d<std::size_t>& r) {
-                                        for (auto y = r.rows().begin(); y != r.rows().end(); ++y)
-                                                  for (auto x = r.cols().begin(); x != r.cols().end(); ++x)
-                                                            b_t(x, y) = a_t(y, x);
-                              }, oneapi::tbb::simple_partitioner{});
-                    benchmark::DoNotOptimize(b_t.data());
-                    benchmark::ClobberMemory();
-          }
+static void BM_transpose_tiling_tbb(benchmark::State &bm) {
+  init_transpose();
+  for (auto _ : bm) {
+    oneapi::tbb::parallel_for(
+        oneapi::tbb::blocked_range2d<std::size_t>(0, ny, blockSize, 0, nx,
+                                                  blockSize),
+        [](const oneapi::tbb::blocked_range2d<std::size_t> &r) {
+          for (auto y = r.rows().begin(); y != r.rows().end(); ++y)
+            for (auto x = r.cols().begin(); x != r.cols().end(); ++x)
+              b_t(x, y) = a_t(y, x);
+        },
+        oneapi::tbb::simple_partitioner{});
+    benchmark::DoNotOptimize(b_t.data());
+    benchmark::ClobberMemory();
+  }
 }
 #endif
 
@@ -1560,95 +1561,95 @@ hpc::HPCHighDimensionFlatArray<2, float> mb(size, size);
 hpc::HPCHighDimensionFlatArray<2, float> mc(size, size);
 
 static void init_matrix_mul() {
-          for (std::size_t y = 0; y < size; ++y) {
-                    for (std::size_t x = 0; x < size; ++x) {
-                              mb(y, x) = static_cast<float>((y + 3 * x) % 17) / 17.0f;
-                              mc(y, x) = static_cast<float>((2 * y + x) % 19) / 19.0f;
-                    }
-          }
+  for (std::size_t y = 0; y < size; ++y) {
+    for (std::size_t x = 0; x < size; ++x) {
+      mb(y, x) = static_cast<float>((y + 3 * x) % 17) / 17.0f;
+      mc(y, x) = static_cast<float>((2 * y + x) % 19) / 19.0f;
+    }
+  }
 }
 
-static void BM_matrix_mul(benchmark::State& bm) {
-          init_matrix_mul();
-          for (auto _ : bm) {
+static void BM_matrix_mul(benchmark::State &bm) {
+  init_matrix_mul();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (long long y = 0; y < size; ++y) {
-                              for (long long x = 0; x < size; ++x) {
-                                        float sum = 0.0f;
-                                        for (std::size_t t = 0; t < size; ++t)
-                                                  sum += mc(y, t) * mb(t, x);
-                                        ma(y, x) = sum;
-                              }
-                    }
-                    benchmark::DoNotOptimize(ma.data());
-                    benchmark::ClobberMemory();
-          }
+    for (long long y = 0; y < size; ++y) {
+      for (long long x = 0; x < size; ++x) {
+        float sum = 0.0f;
+        for (std::size_t t = 0; t < size; ++t)
+          sum += mc(y, t) * mb(t, x);
+        ma(y, x) = sum;
+      }
+    }
+    benchmark::DoNotOptimize(ma.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 constexpr std::size_t matrix_block = 32;
 
-static void BM_matrix_mul_blocked(benchmark::State& bm) {
-          init_matrix_mul();
-          for (auto _ : bm) {
+static void BM_matrix_mul_blocked(benchmark::State &bm) {
+  init_matrix_mul();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (long long y = 0; y < size; ++y) {
-                              for (long long xBase = 0; xBase < size; xBase += matrix_block) {
-                                        const auto xEnd = xBase + std::min(matrix_block, size - xBase);
-                                        for (auto x = xBase; x < xEnd; ++x)
-                                                  ma(y, x) = 0.0f;
-                                        for (std::size_t t = 0; t < size; ++t) {
-                                                  const float c = mc(y, t);
-                                                  for (auto x = xBase; x < xEnd; ++x)
-                                                            ma(y, x) += c * mb(t, x);
-                                        }
-                              }
-                    }
-                    benchmark::DoNotOptimize(ma.data());
-                    benchmark::ClobberMemory();
-          }
+    for (long long y = 0; y < size; ++y) {
+      for (long long xBase = 0; xBase < size; xBase += matrix_block) {
+        const auto xEnd = xBase + std::min(matrix_block, size - xBase);
+        for (auto x = xBase; x < xEnd; ++x)
+          ma(y, x) = 0.0f;
+        for (std::size_t t = 0; t < size; ++t) {
+          const float c = mc(y, t);
+          for (auto x = xBase; x < xEnd; ++x)
+            ma(y, x) += c * mb(t, x);
+        }
+      }
+    }
+    benchmark::DoNotOptimize(ma.data());
+    benchmark::ClobberMemory();
+  }
 }
 
-//YXx
-static void BM_matrix_mul_blocked_unroll(benchmark::State& bm) {
-          init_matrix_mul();
-          for (auto _ : bm) {
+// YXx
+static void BM_matrix_mul_blocked_unroll(benchmark::State &bm) {
+  init_matrix_mul();
+  for (auto _ : bm) {
 #pragma omp parallel for collapse(2) schedule(static)
-                    for (long long y = 0; y < size; ++y) {
-                              for (long long xBase = 0; xBase < size; xBase += matrix_block) {
-                                        const auto xEnd = xBase + std::min(matrix_block, size - xBase);
-                                        for (auto x = xBase; x < xEnd; ++x)
-                                                  ma(y, x) = 0.0f;
+    for (long long y = 0; y < size; ++y) {
+      for (long long xBase = 0; xBase < size; xBase += matrix_block) {
+        const auto xEnd = xBase + std::min(matrix_block, size - xBase);
+        for (auto x = xBase; x < xEnd; ++x)
+          ma(y, x) = 0.0f;
 
-                                        auto x = xBase;
-                                        for (; x + 3 < xEnd; x += 4) {
-                                                  float d0 = ma(y, x + 0);
-                                                  float d1 = ma(y, x + 1);
-                                                  float d2 = ma(y, x + 2);
-                                                  float d3 = ma(y, x + 3);
+        auto x = xBase;
+        for (; x + 3 < xEnd; x += 4) {
+          float d0 = ma(y, x + 0);
+          float d1 = ma(y, x + 1);
+          float d2 = ma(y, x + 2);
+          float d3 = ma(y, x + 3);
 
-                                                  for (std::size_t t = 0; t < size; ++t) {
-                                                            float c = mc(y, t);
-                                                            d0 += c * mb(t, x + 0);
-                                                            d1 += c * mb(t, x + 1);
-                                                            d2 += c * mb(t, x + 2);
-                                                            d3 +=c * mb(t, x + 3);
-                                                  }
-                                                  ma(y, x + 0) = d0;
-                                                  ma(y, x + 1) = d1;
-                                                  ma(y, x + 2) = d2;
-                                                  ma(y, x + 3) = d3;
-                                        }
-
-                                        for (; x < xEnd; ++x) {
-                                                  for (std::size_t t = 0; t < size; ++t) {
-                                                            ma(y, x) += mc(y, t) * mb(t, x);
-                                                  }
-                                        }
-                              }
-                    }
-                    benchmark::DoNotOptimize(ma.data());
-                    benchmark::ClobberMemory();
+          for (std::size_t t = 0; t < size; ++t) {
+            float c = mc(y, t);
+            d0 += c * mb(t, x + 0);
+            d1 += c * mb(t, x + 1);
+            d2 += c * mb(t, x + 2);
+            d3 += c * mb(t, x + 3);
           }
+          ma(y, x + 0) = d0;
+          ma(y, x + 1) = d1;
+          ma(y, x + 2) = d2;
+          ma(y, x + 3) = d3;
+        }
+
+        for (; x < xEnd; ++x) {
+          for (std::size_t t = 0; t < size; ++t) {
+            ma(y, x) += mc(y, t) * mb(t, x);
+          }
+        }
+      }
+    }
+    benchmark::DoNotOptimize(ma.data());
+    benchmark::ClobberMemory();
+  }
 }
 
 constexpr int conv_block = 16;
@@ -1740,7 +1741,7 @@ static void BM_conv_block_unroll(benchmark::State &bm) {
                 temp += kb(y + l, x + k) * kc(l, k);
               }
             }
-            ka(y, x) = temp ;
+            ka(y, x) = temp;
           }
         }
       }
@@ -2401,114 +2402,114 @@ static void BM_radix_sort_cache_thread_v2(benchmark::State &bm) {
   }
 }
 
- BENCHMARK(BM_fill_zero_serial);
- BENCHMARK(BM_fill_zero_parallel_omp);
+BENCHMARK(BM_fill_zero_serial);
+BENCHMARK(BM_fill_zero_parallel_omp);
 
- #if COREFORGE_USE_TBB
- BENCHMARK(BM_fill_zero_parallel_tbb);
- #endif
+#if COREFORGE_USE_TBB
+BENCHMARK(BM_fill_zero_parallel_tbb);
+#endif
 
- BENCHMARK(BM_sin_serial);
- BENCHMARK(BM_sin_parallel_omp);
+BENCHMARK(BM_sin_serial);
+BENCHMARK(BM_sin_parallel_omp);
 
- #if COREFORGE_USE_TBB
- BENCHMARK(BM_sin_parallel_tbb);
- #endif
+#if COREFORGE_USE_TBB
+BENCHMARK(BM_sin_parallel_tbb);
+#endif
 
- BENCHMARK(BM_serial_simple_inc);
- BENCHMARK(BM_serial_complex_inc);
- BENCHMARK(BM_parallel_simple_inc);
- BENCHMARK(BM_parallel_complex_inc);
+BENCHMARK(BM_serial_simple_inc);
+BENCHMARK(BM_serial_complex_inc);
+BENCHMARK(BM_parallel_simple_inc);
+BENCHMARK(BM_parallel_complex_inc);
 
- BENCHMARK(BM_strided)
-     ->Arg(1)
-     ->Arg(2)
-     ->Arg(4)
-     ->Arg(8)
-     ->Arg(16)
-     ->Arg(32)
-     ->Arg(64)
-     ->Arg(128)
-     ->UseRealTime();
+BENCHMARK(BM_strided)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(4)
+    ->Arg(8)
+    ->Arg(16)
+    ->Arg(32)
+    ->Arg(64)
+    ->Arg(128)
+    ->UseRealTime();
 
- BENCHMARK(BM_fill)
-     ->Arg(16 * 1024)
-     ->Arg(128 * 1024)
-     ->Arg(1024 * 1024)
-     ->Arg(16 * 1024 * 1024)
-     ->Arg(128 * 1024 * 1024)
-     ->Arg(1024 * 1024 * 1024)
-     ->UseRealTime();
+BENCHMARK(BM_fill)
+    ->Arg(16 * 1024)
+    ->Arg(128 * 1024)
+    ->Arg(1024 * 1024)
+    ->Arg(16 * 1024 * 1024)
+    ->Arg(128 * 1024 * 1024)
+    ->Arg(1024 * 1024 * 1024)
+    ->UseRealTime();
 
- BENCHMARK(BM_AOS_partical)->UseRealTime();
- BENCHMARK(BM_SOA_partical)->UseRealTime();
- BENCHMARK(BM_AOSOA_partical)->UseRealTime();
- BENCHMARK(BM_AOS_all_properties)->UseRealTime();
- BENCHMARK(BM_SOA_all_properties)->UseRealTime();
- BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
+BENCHMARK(BM_AOS_partical)->UseRealTime();
+BENCHMARK(BM_SOA_partical)->UseRealTime();
+BENCHMARK(BM_AOSOA_partical)->UseRealTime();
+BENCHMARK(BM_AOS_all_properties)->UseRealTime();
+BENCHMARK(BM_SOA_all_properties)->UseRealTime();
+BENCHMARK(BM_AOSOA_all_properties)->UseRealTime();
 
- BENCHMARK(BM_ordered)->UseRealTime();
- BENCHMARK(BM_random)->UseRealTime();
- BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
- BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
- BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
- BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
- BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
+BENCHMARK(BM_ordered)->UseRealTime();
+BENCHMARK(BM_random)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_64_seq_base_aligned_prefetch)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_not_aligned)->UseRealTime();
+BENCHMARK(BM_rand_blk_4096_seq_base_aligned)->UseRealTime();
 
- BENCHMARK(BM_read)->UseRealTime();
- BENCHMARK(BM_read_and_write)->UseRealTime();
- BENCHMARK(BM_write)->UseRealTime();
- BENCHMARK(BM_write_zero)->UseRealTime();
- BENCHMARK(BM_write_one)->UseRealTime();
- BENCHMARK(BM_write_streamed)->UseRealTime();
- BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
+BENCHMARK(BM_read)->UseRealTime();
+BENCHMARK(BM_read_and_write)->UseRealTime();
+BENCHMARK(BM_write)->UseRealTime();
+BENCHMARK(BM_write_zero)->UseRealTime();
+BENCHMARK(BM_write_one)->UseRealTime();
+BENCHMARK(BM_write_streamed)->UseRealTime();
+BENCHMARK(BM_write_streamed_and_read)->UseRealTime();
 
- BENCHMARK(BM_origin)->UseRealTime();
- BENCHMARK(BM_init)->UseRealTime();
+BENCHMARK(BM_origin)->UseRealTime();
+BENCHMARK(BM_init)->UseRealTime();
 
- BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
- BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
- BENCHMARK(BM_java_style_random)->UseRealTime();
- BENCHMARK(BM_flat_random)->UseRealTime();
+BENCHMARK(BM_allocate_java_style_seq)->UseRealTime();
+BENCHMARK(BM_allocate_flat_seq)->UseRealTime();
+BENCHMARK(BM_java_style_random)->UseRealTime();
+BENCHMARK(BM_flat_random)->UseRealTime();
 
- BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
- BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
+BENCHMARK(BM_with_false_sharing_issue)->UseRealTime();
+BENCHMARK(BM_avoid_false_sharing_issue)->UseRealTime();
 
- BENCHMARK(BM_XY)->UseRealTime();
- BENCHMARK(BM_YX)->UseRealTime();
+BENCHMARK(BM_XY)->UseRealTime();
+BENCHMARK(BM_YX)->UseRealTime();
 
- BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
- BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
+BENCHMARK(BM_loop_fusion_seperate)->UseRealTime();
+BENCHMARK(BM_loop_fusion_merged)->UseRealTime();
 
- BENCHMARK(BM_x_blur)->UseRealTime();
- BENCHMARK(BM_x_blur_prefetch)->UseRealTime();
- BENCHMARK(BM_x_blur_cond_prefetch)->UseRealTime();
- BENCHMARK(BM_x_blur_tiling_prefetch)->UseRealTime();
- BENCHMARK(BM_x_blur_tiling_simd_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur)->UseRealTime();
+BENCHMARK(BM_x_blur_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_cond_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_tiling_prefetch)->UseRealTime();
+BENCHMARK(BM_x_blur_tiling_simd_prefetch)->UseRealTime();
 
- BENCHMARK(BM_y_blur)->UseRealTime();
- BENCHMARK(BM_y_blur_tiling)->UseRealTime();
- BENCHMARK(BM_Xyx_blur_tiling)->UseRealTime();
- BENCHMARK(BM_Xyx_blur_tiling_prefetch)->UseRealTime();
- BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_merged)->UseRealTime();
- BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_ILP)->UseRealTime();
+BENCHMARK(BM_y_blur)->UseRealTime();
+BENCHMARK(BM_y_blur_tiling)->UseRealTime();
+BENCHMARK(BM_Xyx_blur_tiling)->UseRealTime();
+BENCHMARK(BM_Xyx_blur_tiling_prefetch)->UseRealTime();
+BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_merged)->UseRealTime();
+BENCHMARK(BM_Xyx_blur_tiling_prefetch_streamed_ILP)->UseRealTime();
 
- #if defined(__x86_64__) || defined(_WIN64)
- BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2)->UseRealTime();
- BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance)->UseRealTime();
- #endif
+#if defined(__x86_64__) || defined(_WIN64)
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2)->UseRealTime();
+BENCHMARK(BM_YXx_blur_tiling_prefetch_streamed_AVX2_in_advance)->UseRealTime();
+#endif
 
- BENCHMARK(BM_transpose)->UseRealTime();
- BENCHMARK(BM_transpose_tiling)->UseRealTime();
- BENCHMARK(BM_transpose_tiling_morton2d)->UseRealTime();
- BENCHMARK(BM_transpose_tiling_morton2d_stream)->UseRealTime();
- #if COREFORGE_USE_TBB
- BENCHMARK(BM_transpose_tiling_tbb)->UseRealTime();
- #endif
+BENCHMARK(BM_transpose)->UseRealTime();
+BENCHMARK(BM_transpose_tiling)->UseRealTime();
+BENCHMARK(BM_transpose_tiling_morton2d)->UseRealTime();
+BENCHMARK(BM_transpose_tiling_morton2d_stream)->UseRealTime();
+#if COREFORGE_USE_TBB
+BENCHMARK(BM_transpose_tiling_tbb)->UseRealTime();
+#endif
 
- BENCHMARK(BM_matrix_mul)->UseRealTime();
- BENCHMARK(BM_matrix_mul_blocked)->UseRealTime();
- BENCHMARK(BM_matrix_mul_blocked_unroll)->UseRealTime();
+BENCHMARK(BM_matrix_mul)->UseRealTime();
+BENCHMARK(BM_matrix_mul_blocked)->UseRealTime();
+BENCHMARK(BM_matrix_mul_blocked_unroll)->UseRealTime();
 
 BENCHMARK(BM_conv)->UseRealTime();
 BENCHMARK(BM_conv_block)->UseRealTime();
